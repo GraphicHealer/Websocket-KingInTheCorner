@@ -1,0 +1,1824 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>King in the Corner - Multiplayer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            overflow: hidden;
+            background: linear-gradient(135deg, #2c5f2d 0%, #97bc62 100%);
+        }
+
+        #container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #gameArea {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            padding-bottom: 180px;
+            /* Account for player hand */
+            overflow: hidden;
+        }
+
+        /* 3x3 Game Board */
+        #gameBoard {
+            display: grid;
+            grid-template-columns: repeat(3, 120px);
+            grid-template-rows: repeat(3, 120px);
+            gap: 15px;
+            position: relative;
+            place-items: center;
+            max-width: 100vw;
+            max-height: calc(100vh - 200px);
+        }
+
+        .pile {
+            background: rgba(255, 255, 255, 0.15);
+            border: 3px dashed rgba(255, 255, 255, 0.4);
+            border-radius: 10px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 90px;
+            height: 125px;
+            padding: 5px;
+            overflow: visible;
+        }
+
+        /* Pile rotations */
+        .pile[data-pile="0"] {
+            transform: rotate(-225deg);
+        }
+
+        .pile[data-pile="1"] {
+            transform: rotate(180deg);
+        }
+
+        .pile[data-pile="2"] {
+            transform: rotate(225deg);
+        }
+
+        .pile[data-pile="3"] {
+            transform: rotate(90deg);
+        }
+
+        .pile[data-pile="5"] {
+            transform: rotate(-90deg);
+        }
+
+        .pile[data-pile="6"] {
+            transform: rotate(45deg);
+        }
+
+        .pile[data-pile="8"] {
+            transform: rotate(-45deg);
+        }
+
+        .pile:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.6);
+        }
+
+        .pile.highlight {
+            background: rgba(255, 215, 0, 0.3);
+            border-color: #ffd700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+
+        .pile.selected {
+            background: rgba(100, 149, 237, 0.3);
+            border-color: #6495ED;
+            border-style: solid;
+            box-shadow: 0 0 20px rgba(100, 149, 237, 0.6);
+        }
+
+        .pile.corner {
+            background: rgba(255, 215, 0, 0.1);
+        }
+
+        /* Card Styling */
+        .card {
+            width: 85px;
+            height: 120px;
+            background: white;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: space-between;
+            padding: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card.red {
+            color: #e74c3c;
+        }
+
+        .card.black {
+            color: #2c3e50;
+        }
+
+        .card-top {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 2px;
+            line-height: 1;
+            font-size: 18px;
+        }
+
+        .card-bottom {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 2px;
+            line-height: 1;
+            font-size: 18px;
+            transform: rotate(180deg);
+            align-self: flex-end;
+        }
+
+        .card-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 36px;
+            opacity: 0.3;
+        }
+
+        /* Draw Pile */
+        #drawPile {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 85px;
+            height: 120px;
+            background: rgba(139, 0, 0, 0.8);
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        #drawPile:hover:not(.disabled) {
+            transform: translate(-50%, -50%) scale(1.05);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        #drawPile.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #drawPile .count {
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        /* Player Hand */
+        #playerHandContainer {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            width: 100vw;
+            height: 200px;
+            overflow-x: auto;
+            overflow-y: visible;
+            z-index: 10;
+            -webkit-overflow-scrolling: touch;
+            padding-top: 35px;
+            pointer-events: none;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        #playerHandContainer::-webkit-scrollbar {
+            display: none;
+        }
+
+        #playerHand {
+            pointer-events: none;
+            position: relative;
+            bottom: auto;
+            left: auto;
+            transform: none;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            height: 140px;
+            overflow: visible;
+        }
+
+        #playerHand .card {
+            pointer-events: auto;
+            position: absolute;
+            bottom: 0;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        #playerHand .card:hover {
+            transform: translateY(-30px) scale(1.1);
+            z-index: 100;
+        }
+
+        #playerHand .card.selected {
+            transform: translateY(-40px) scale(1.05);
+            box-shadow: 0 8px 20px rgba(255, 215, 0, 0.6);
+            border: 3px solid #ffd700;
+            z-index: 101;
+        }
+
+        /* End Turn Button in Player Info */
+        #endTurnBtn {
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 100%;
+            margin-top: 8px;
+        }
+
+        #endTurnBtn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+        }
+
+        #endTurnBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Player Info Container */
+        #playerInfoContainer {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-width: 200px;
+            z-index: 10;
+        }
+
+        #playerInfo {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .player-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .player-card.active {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.2);
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+        }
+
+        .player-name {
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .card-count {
+            color: #ffd700;
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        /* Message Display */
+        #message {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            display: none;
+            z-index: 100;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        #message.show {
+            display: block;
+        }
+
+        #message.success {
+            background: rgba(46, 204, 113, 0.9);
+        }
+
+        #message.error {
+            background: rgba(231, 76, 60, 0.9);
+        }
+
+        #message.info {
+            background: rgba(52, 152, 219, 0.9);
+        }
+
+        /* Modals */
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 200;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal h1 {
+            color: white;
+            font-size: 48px;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal h2 {
+            color: #ffd700;
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .modal p {
+            color: #ccc;
+            font-size: 18px;
+            max-width: 500px;
+            line-height: 1.6;
+        }
+
+        .modal button {
+            width: 280px;
+            padding: 18px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transition: all 0.2s;
+        }
+
+        .modal button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .modal input {
+            width: 280px;
+            padding: 18px;
+            font-size: 18px;
+            border: 2px solid #555;
+            border-radius: 8px;
+            background: #2a2a2a;
+            color: white;
+        }
+
+        .modal input::placeholder {
+            color: #888;
+        }
+
+        /* Rules Display */
+        #rules {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 12px;
+            max-width: 600px;
+            text-align: left;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        #rules h3 {
+            color: #ffd700;
+            margin-top: 15px;
+            margin-bottom: 10px;
+        }
+
+        #rules ul {
+            list-style: none;
+            padding-left: 20px;
+        }
+
+        #rules li {
+            color: #ccc;
+            margin: 8px 0;
+            line-height: 1.5;
+        }
+
+        #rules li::before {
+            content: "→ ";
+            color: #97bc62;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        /* Helper Buttons */
+        #helpBtn,
+        #muteBtn {
+            position: fixed;
+            bottom: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 28px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            z-index: 50;
+            transition: all 0.2s;
+        }
+
+        #helpBtn {
+            right: 20px;
+        }
+
+        #muteBtn {
+            left: 20px;
+        }
+
+        #helpBtn:hover,
+        #muteBtn:hover {
+            transform: scale(1.1);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            body {
+                overflow: hidden;
+                width: 100%;
+                height: 100%;
+            }
+
+            #gameArea {
+                padding-bottom: 200px;
+            }
+
+            #gameBoard {
+                grid-template-columns: repeat(3, 75px);
+                grid-template-rows: repeat(3, 85px);
+                gap: 20px;
+                max-width: calc(100vw - 20px);
+            }
+
+            .pile {
+                width: 70px;
+                height: 100px;
+            }
+
+            .card {
+                width: 65px;
+                height: 95px;
+                font-size: 12px;
+                padding: 5px;
+            }
+
+            .card-top,
+            .card-bottom {
+                font-size: 12px;
+            }
+
+            .card-center {
+                font-size: 24px;
+            }
+
+            #drawPile {
+                width: 70px;
+                height: 100px;
+            }
+
+            #playerHandContainer {
+                height: 170px;
+                overflow-x: scroll;
+                overflow-y: visible;
+                padding: 0 50vw;
+                padding-bottom: 15px;
+            }
+
+            #playerHand {
+                height: 155px;
+                max-width: none;
+            }
+
+            /* Move player info above hand in mobile */
+            #playerInfoContainer {
+                position: fixed;
+                right: auto;
+                left: 50%;
+                top: auto;
+                bottom: 140px;
+                transform: translateX(-50%);
+                flex-direction: row;
+                gap: 8px;
+                max-width: 90vw;
+                align-items: center;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+
+            #playerInfo {
+                flex-direction: row;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+
+            .player-card {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .player-name {
+                font-size: 12px;
+            }
+
+            .card-count {
+                font-size: 14px;
+                margin-top: 2px;
+            }
+
+            #endTurnBtn {
+                padding: 10px 16px;
+                font-size: 14px;
+                width: auto;
+                margin-top: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container">
+        <div id="gameArea">
+            <div id="message"></div>
+
+            <div id="playerInfoContainer">
+                <div id="playerInfo"></div>
+                <button id="endTurnBtn">End Turn</button>
+            </div>
+
+            <!-- 3x3 Game Board: Corners (0,2,6,8), Foundations (1,3,5,7), Center (4) -->
+            <div id="gameBoard">
+                <div class="pile corner" data-pile="0"></div>
+                <div class="pile" data-pile="1"></div>
+                <div class="pile corner" data-pile="2"></div>
+                <div class="pile" data-pile="3"></div>
+                <div class="pile center" data-pile="4">
+                    <div id="drawPile">
+                        <div class="count">52</div>
+                    </div>
+                </div>
+                <div class="pile" data-pile="5"></div>
+                <div class="pile corner" data-pile="6"></div>
+                <div class="pile" data-pile="7"></div>
+                <div class="pile corner" data-pile="8"></div>
+            </div>
+
+            <div id="playerHandContainer">
+                <div id="playerHand"></div>
+            </div>
+        </div>
+    </div>
+
+    <button id="helpBtn">?</button>
+    <button id="muteBtn">🔊</button>
+
+    <!-- Startup Modal -->
+    <div id="startupModal" class="modal active">
+        <h1>👑 King in the Corner</h1>
+        <p>Strategic card game - be the first to empty your hand!</p>
+        <button id="onlineBtn">Play Online</button>
+    </div>
+
+    <!-- Online Modal -->
+    <div id="onlineModal" class="modal">
+        <h1>Online Multiplayer</h1>
+        <input id="nameInput" placeholder="Enter your name" maxlength="20">
+        <button id="publicBtn">Find Public Game</button>
+        <button id="privateBtn">Private Game</button>
+        <button id="backBtn">Back</button>
+    </div>
+
+    <!-- Private Modal -->
+    <div id="privateModal" class="modal">
+        <h1>Private Game</h1>
+        <button id="createPrivateBtn">Create Private Game</button>
+        <input id="roomInput" placeholder="Enter Room Code" maxlength="8">
+        <button id="joinPrivateBtn">Join Private Game</button>
+        <button id="backToOnlineBtn">Back</button>
+    </div>
+
+    <!-- Waiting Modal -->
+    <div id="waitingModal" class="modal">
+        <h1 id="waitingTitle">Waiting for players...</h1>
+        <p id="waitingText"></p>
+        <div id="roomPlayers" style="display: none; margin: 20px 0;">
+            <h3 style="color: #ffd700; margin-bottom: 15px;">Players in Room:</h3>
+            <div id="playersList" style="color: white; font-size: 18px;"></div>
+        </div>
+        <div id="gameStartControls" style="display: none; margin-top: 20px;">
+            <p id="countdownText" style="color: #ffd700; font-size: 24px; margin-bottom: 15px;"></p>
+            <p id="readyStatus" style="color: #aaa; font-size: 16px; margin-bottom: 10px;"></p>
+            <button id="readyBtn" style="width: 280px;">I'm Ready!</button>
+            <button id="startGameBtn"
+                style="width: 280px; display: none; margin-top: 10px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">Start
+                Game Now</button>
+        </div>
+    </div>
+
+    <!-- Win Modal -->
+    <div id="winModal" class="modal">
+        <h1 id="winText">You Win!</h1>
+        <div id="rematchPlayers" style="display: none; margin: 20px 0;">
+            <h3 style="color: #ffd700; margin-bottom: 15px;">Rematch Status:</h3>
+            <div id="rematchList" style="color: white; font-size: 18px;"></div>
+        </div>
+        <p id="rematchStatus" style="color: #aaa; font-size: 16px; margin: 15px 0;"></p>
+        <button id="rematchBtn">Play Again</button>
+        <button id="menuBtn">Main Menu</button>
+    </div>
+
+    <!-- Rules Modal -->
+    <div id="rulesModal" class="modal">
+        <h2>How to Play</h2>
+        <div id="rules">
+            <h3>🎯 Objective</h3>
+            <ul>
+                <li>Be the first player to play all your cards</li>
+            </ul>
+
+            <h3>🎮 Setup</h3>
+            <ul>
+                <li>Each player starts with 7 cards</li>
+                <li>4 foundation piles are dealt in the center (North, South, East, West)</li>
+                <li>4 corner positions start empty</li>
+            </ul>
+
+            <h3>📋 Rules</h3>
+            <ul>
+                <li><strong>Foundation Piles:</strong> Play cards in descending order, alternating colors (e.g., Red 8
+                    on Black 9)</li>
+                <li><strong>Corner Piles:</strong> Start with a King, then build down alternating colors</li>
+                <li><strong>Draw:</strong> If you can't play, draw one card from the deck</li>
+                <li><strong>End Turn:</strong> Click "End Turn" when you're done playing</li>
+            </ul>
+
+            <h3>👑 Kings</h3>
+            <ul>
+                <li>Kings can ONLY be played in the 4 corner positions</li>
+                <li>Once a King is in a corner, build down from it (alternating colors)</li>
+                <li>Playing a King in a corner is a powerful move!</li>
+            </ul>
+
+            <h3>🎲 Gameplay</h3>
+            <ul>
+                <li>On your turn, play as many cards as possible</li>
+                <li>You can move entire piles onto other valid piles</li>
+                <li>If you play all your cards, you win!</li>
+                <li>If you can't play, draw a card and end your turn</li>
+            </ul>
+
+            <h3>🏆 Winning</h3>
+            <ul>
+                <li>First player to empty their hand wins!</li>
+            </ul>
+        </div>
+        <button id="closeRulesBtn">Got it!</button>
+    </div>
+
+    <script>
+        // ==================== CONFIGURATION ====================
+        const CONFIG = {
+            WS_URL: 'ws://localhost:3001',
+            CARD_SUITS: ['♠', '♥', '♦', '♣'],
+            CARD_RANKS: ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'],
+            RANK_VALUES: { 'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13 },
+            INITIAL_HAND_SIZE: 7,
+            CORNER_POSITIONS: [0, 2, 6, 8],
+            FOUNDATION_POSITIONS: [1, 3, 5, 7]
+        };
+
+        // ==================== STATE ====================
+        const state = {
+            game: {
+                deck: [],
+                piles: [[], [], [], [], [], [], [], [], []],
+                playerHands: [[], [], [], []],
+                playerNames: ['', '', '', ''],
+                activePlayers: 0,
+                currentPlayer: 0,
+                isMultiplayer: false,
+                myPlayer: 0,
+                gameStarted: false,
+                selectedCard: null,
+                selectedPile: null,
+                hasDrawn: false,
+                hasPlayed: false
+            },
+            network: {
+                ws: null,
+                roomId: null,
+                connected: false
+            },
+            player: {
+                name: ''
+            },
+            audio: {
+                muted: false
+            }
+        };
+
+        // ==================== DOM REFERENCES ====================
+        const dom = {
+            gameBoard: document.getElementById('gameBoard'),
+            drawPile: document.getElementById('drawPile'),
+            playerHand: document.getElementById('playerHand'),
+            endTurnBtn: document.getElementById('endTurnBtn'),
+            message: document.getElementById('message'),
+            helpBtn: document.getElementById('helpBtn'),
+            muteBtn: document.getElementById('muteBtn'),
+            modals: {
+                startup: document.getElementById('startupModal'),
+                online: document.getElementById('onlineModal'),
+                private: document.getElementById('privateModal'),
+                waiting: document.getElementById('waitingModal'),
+                win: document.getElementById('winModal'),
+                rules: document.getElementById('rulesModal')
+            },
+            buttons: {
+                online: document.getElementById('onlineBtn'),
+                back: document.getElementById('backBtn'),
+                public: document.getElementById('publicBtn'),
+                private: document.getElementById('privateBtn'),
+                createPrivate: document.getElementById('createPrivateBtn'),
+                joinPrivate: document.getElementById('joinPrivateBtn'),
+                backToOnline: document.getElementById('backToOnlineBtn'),
+                rematch: document.getElementById('rematchBtn'),
+                menu: document.getElementById('menuBtn'),
+                closeRules: document.getElementById('closeRulesBtn')
+            },
+            inputs: {
+                name: document.getElementById('nameInput'),
+                room: document.getElementById('roomInput')
+            },
+            waitingText: document.getElementById('waitingText'),
+            winText: document.getElementById('winText'),
+            roomPlayers: document.getElementById('roomPlayers'),
+            playersList: document.getElementById('playersList'),
+            gameStartControls: document.getElementById('gameStartControls'),
+            countdownText: document.getElementById('countdownText'),
+            readyStatus: document.getElementById('readyStatus'),
+            readyBtn: document.getElementById('readyBtn'),
+            startGameBtn: document.getElementById('startGameBtn'),
+            waitingTitle: document.getElementById('waitingTitle'),
+            rematchPlayers: document.getElementById('rematchPlayers'),
+            rematchList: document.getElementById('rematchList'),
+            rematchStatus: document.getElementById('rematchStatus')
+        };
+
+        // ==================== UTILITY FUNCTIONS ====================
+        const utils = {
+            showModal(modalName) {
+                Object.values(dom.modals).forEach(m => m.classList.remove('active'));
+                dom.modals[modalName]?.classList.add('active');
+            },
+
+            hideAllModals() {
+                Object.values(dom.modals).forEach(m => m.classList.remove('active'));
+            },
+
+            showMessage(text, type = 'info', duration = 2000) {
+                dom.message.textContent = text;
+                dom.message.className = `show ${type}`;
+                setTimeout(() => {
+                    dom.message.classList.remove('show');
+                }, duration);
+            },
+
+            playSound(frequency, duration) {
+                if (state.audio.muted) return;
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                oscillator.frequency.value = frequency;
+                oscillator.type = 'sine';
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + duration);
+            },
+
+            shuffleArray(array) {
+                const shuffled = [...array];
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
+                return shuffled;
+            }
+        };
+
+        // ==================== CARD FUNCTIONS ====================
+        const cards = {
+            createDeck() {
+                const deck = [];
+                for (const suit of CONFIG.CARD_SUITS) {
+                    for (const rank of CONFIG.CARD_RANKS) {
+                        deck.push({ rank, suit });
+                    }
+                }
+                return utils.shuffleArray(deck);
+            },
+
+            getCardValue(rank) {
+                return CONFIG.RANK_VALUES[rank];
+            },
+
+            isRed(suit) {
+                return suit === '♥' || suit === '♦';
+            },
+
+            canPlaceOnPile(card, pileIndex) {
+                // Can't place on center pile (draw pile)
+                if (pileIndex === 4) return false;
+
+                const pile = state.game.piles[pileIndex];
+                const isCorner = CONFIG.CORNER_POSITIONS.includes(pileIndex);
+
+                // Empty pile rules
+                if (pile.length === 0) {
+                    // Corners: ONLY Kings allowed
+                    if (isCorner) {
+                        return card.rank === 'K';
+                    }
+                    // Foundation piles: Any card EXCEPT Kings
+                    return card.rank !== 'K';
+                }
+
+                // Non-empty pile rules
+                const topCard = pile[pile.length - 1];
+                const cardValue = this.getCardValue(card.rank);
+                const topValue = this.getCardValue(topCard.rank);
+
+                // Kings can only be placed in empty corners, not on other cards
+                if (card.rank === 'K') return false;
+
+                // Must be one rank lower
+                if (cardValue !== topValue - 1) return false;
+
+                // Must alternate colors
+                const cardIsRed = this.isRed(card.suit);
+                const topIsRed = this.isRed(topCard.suit);
+
+                return cardIsRed !== topIsRed;
+            },
+
+            createCardElement(card, clickHandler = null) {
+                const cardEl = document.createElement('div');
+                cardEl.className = 'card ' + (this.isRed(card.suit) ? 'red' : 'black');
+
+                const topDiv = document.createElement('div');
+                topDiv.className = 'card-top';
+                topDiv.innerHTML = `<span>${card.rank}</span><span>${card.suit}</span>`;
+
+                const centerDiv = document.createElement('div');
+                centerDiv.className = 'card-center';
+                centerDiv.textContent = card.suit;
+
+                const bottomDiv = document.createElement('div');
+                bottomDiv.className = 'card-bottom';
+                bottomDiv.innerHTML = `<span>${card.rank}</span><span>${card.suit}</span>`;
+
+                cardEl.appendChild(topDiv);
+                cardEl.appendChild(centerDiv);
+                cardEl.appendChild(bottomDiv);
+
+                if (clickHandler) {
+                    cardEl.addEventListener('click', () => clickHandler(card, cardEl));
+                }
+
+                return cardEl;
+            }
+        };
+
+        // ==================== GAME LOGIC ====================
+        const game = {
+            init() {
+                const deck = cards.createDeck();
+                this.initWithDeck(deck);
+            },
+
+            initWithDeck(deck) {
+                state.game.deck = [...deck];
+                state.game.piles = [[], [], [], [], [], [], [], [], []];
+                state.game.selectedCard = null;
+                state.game.hasDrawn = false;
+                state.game.hasPlayed = false;
+
+                for (let i = 0; i < 4; i++) state.game.playerHands[i] = [];
+
+                CONFIG.FOUNDATION_POSITIONS.forEach(pos => {
+                    if (state.game.deck.length > 0) {
+                        state.game.piles[pos].push(state.game.deck.pop());
+                    }
+                });
+
+                for (let i = 0; i < CONFIG.INITIAL_HAND_SIZE; i++) {
+                    for (let p = 0; p < state.game.activePlayers; p++) {
+                        if (state.game.deck.length > 0) {
+                            state.game.playerHands[p].push(state.game.deck.pop());
+                        }
+                    }
+                }
+
+                state.game.currentPlayer = 0;
+                state.game.gameStarted = true;
+                this.updateUI();
+                this.renderBoard();
+                this.renderHand();
+                console.log(`🎮 Game initialized with ${state.game.activePlayers} players`);
+            },
+
+            playCard(card, pileIndex, sendToRemote = true) {
+                if (!state.game.gameStarted) return;
+                const player = state.game.myPlayer;
+                if (state.game.isMultiplayer && state.game.currentPlayer !== player) return;
+
+                const hand = state.game.playerHands[player];
+                const idx = hand.findIndex(c => c.rank === card.rank && c.suit === card.suit);
+                if (idx === -1) return;
+
+                if (!cards.canPlaceOnPile(card, pileIndex)) {
+                    utils.showMessage('Invalid move!', 'error');
+                    return;
+                }
+
+                hand.splice(idx, 1);
+                state.game.piles[pileIndex].push(card);
+                state.game.hasPlayed = true;
+                state.game.selectedCard = null;
+                utils.playSound(440, 0.1);
+
+                this.renderBoard();
+                this.renderHand();
+                this.updateUI();
+
+                if (sendToRemote && state.game.isMultiplayer) {
+                    network.sendGameAction({ type: 'play', card, pile: pileIndex, player });
+                }
+
+                this.checkWin();
+            },
+
+            movePile(fromPileIndex, toPileIndex, sendToRemote = true) {
+                if (!state.game.gameStarted) return;
+                if (fromPileIndex === toPileIndex) {
+                    state.game.selectedPile = null;
+                    this.renderBoard();
+                    return;
+                }
+
+                // Can't move from/to center pile
+                if (fromPileIndex === 4 || toPileIndex === 4) {
+                    utils.showMessage('Cannot move draw pile!', 'error');
+                    state.game.selectedPile = null;
+                    this.renderBoard();
+                    return;
+                }
+
+                const fromPile = state.game.piles[fromPileIndex];
+                const toPile = state.game.piles[toPileIndex];
+
+                if (fromPile.length === 0) {
+                    state.game.selectedPile = null;
+                    this.renderBoard();
+                    return;
+                }
+
+                // Check if bottom card of fromPile can be placed on top card of toPile
+                const bottomCard = fromPile[0];
+
+                if (!cards.canPlaceOnPile(bottomCard, toPileIndex)) {
+                    utils.showMessage('Invalid pile move!', 'error');
+                    state.game.selectedPile = null;
+                    this.renderBoard();
+                    return;
+                }
+
+                // Move entire pile
+                state.game.piles[toPileIndex].push(...fromPile);
+                state.game.piles[fromPileIndex] = [];
+                state.game.hasPlayed = true;
+                state.game.selectedPile = null;
+                utils.playSound(440, 0.1);
+
+                this.renderBoard();
+                this.updateUI();
+
+                if (sendToRemote && state.game.isMultiplayer) {
+                    network.sendGameAction({ type: 'movePile', from: fromPileIndex, to: toPileIndex });
+                }
+            },
+
+            drawCard(sendToRemote = true) {
+                if (!state.game.gameStarted || state.game.hasDrawn) return;
+                const player = state.game.myPlayer;
+                if (state.game.isMultiplayer && state.game.currentPlayer !== player) return;
+
+                if (state.game.deck.length === 0) {
+                    utils.showMessage('Deck is empty!', 'error');
+                    return;
+                }
+
+                const card = state.game.deck.pop();
+                state.game.playerHands[player].push(card);
+                state.game.hasDrawn = true;
+                utils.playSound(330, 0.1);
+
+                this.renderHand();
+                this.updateUI();
+
+                if (sendToRemote && state.game.isMultiplayer) {
+                    network.sendGameAction({ type: 'draw', player });
+                }
+
+                utils.showMessage('Drew a card', 'info');
+            },
+
+            endTurn(sendToRemote = true) {
+                if (!state.game.gameStarted) return;
+                const player = state.game.myPlayer;
+                if (state.game.isMultiplayer && state.game.currentPlayer !== player) return;
+
+                state.game.currentPlayer = (state.game.currentPlayer + 1) % state.game.activePlayers;
+                state.game.hasDrawn = false;
+                state.game.hasPlayed = false;
+                state.game.selectedCard = null;
+
+                this.renderHand();
+                this.updateUI();
+
+                if (sendToRemote && state.game.isMultiplayer) {
+                    network.sendGameAction({ type: 'endTurn', nextPlayer: state.game.currentPlayer });
+                }
+
+                utils.showMessage(`${this.getPlayerName(state.game.currentPlayer)}'s turn`, 'info');
+            },
+
+            renderBoard() {
+                document.querySelectorAll('.pile').forEach((pileEl, i) => {
+                    // Skip center pile (4) - it contains the draw pile
+                    if (i === 4) {
+                        // Update draw pile count
+                        const drawPileEl = document.getElementById('drawPile');
+                        if (drawPileEl) {
+                            const countEl = drawPileEl.querySelector('.count');
+                            if (countEl) {
+                                countEl.textContent = state.game.deck.length;
+                            }
+                        }
+                        return;
+                    }
+
+                    pileEl.innerHTML = '';
+                    const pile = state.game.piles[i];
+
+                    // Add click handler to pile element itself
+                    pileEl.onclick = (e) => {
+                        // Only trigger if clicking the pile background, not a card
+                        if (e.target === pileEl) {
+                            this.onPileClick(i);
+                        }
+                    };
+
+                    if (pile.length > 0) {
+                        // Show cascading cards
+                        // Responsive offsets based on screen size
+                        const isMobile = window.innerWidth <= 768;
+                        const normalOffset = isMobile ? 20 : 25; // Normal spacing between cards
+                        const baseOffset = isMobile ? 20 : 25; // Starting offset for bottom card visibility
+                        const maxOffset = normalOffset * (isMobile ? 1 : 4); // Maximum offset
+
+                        pile.forEach((card, cardIndex) => {
+                            const cardEl = cards.createCardElement(card, () => this.onPileClick(i));
+                            cardEl.style.position = 'absolute';
+                            cardEl.style.zIndex = cardIndex;
+
+                            let cascadeOffset;
+                            if (cardIndex === 0) {
+                                // Bottom card always at 0
+                                cascadeOffset = 0;
+                            } else if (pile.length <= (isMobile ? 2 : 5)) {
+                                // Normal spacing for 5 or fewer cards (starting from baseOffset)
+                                cascadeOffset = baseOffset + ((cardIndex - 1) * normalOffset);
+                            } else {
+                                // Evenly space cards from baseOffset to maxOffset + baseOffset
+                                cascadeOffset = baseOffset + (((cardIndex - 1) / (pile.length - 2)) * maxOffset);
+                            }
+
+                            // Position based on pile location
+                            // Cards cascade "down" within their rotated pile
+                            if (i === 0) {
+                                // Top-left corner - pile rotated -45deg
+                                cardEl.style.top = `${cascadeOffset}px`;
+                                cardEl.style.left = '50%';
+                                cardEl.style.transform = 'translateX(-50%)';
+                            } else if (i === 1) {
+                                // Top pile - pile rotated 180deg
+                                cardEl.style.top = `${cascadeOffset}px`;
+                                cardEl.style.left = '50%';
+                                cardEl.style.transform = 'translateX(-50%)';
+                            } else if (i === 2) {
+                                // Top-right corner - pile rotated 45deg
+                                cardEl.style.top = `${cascadeOffset}px`;
+                                cardEl.style.left = '50%';
+                                cardEl.style.transform = 'translateX(-50%)';
+                            } else if (i === 3) {
+                                // Left pile - pile rotated 90deg
+                                cardEl.style.top = `${cascadeOffset}px`;
+                                cardEl.style.left = '50%';
+                                cardEl.style.transform = 'translateX(-50%)';
+                            } else if (i === 5) {
+                                // Right pile - pile rotated -90deg
+                                cardEl.style.top = `${cascadeOffset}px`;
+                                cardEl.style.left = '50%';
+                                cardEl.style.transform = 'translateX(-50%)';
+                            } else if (i === 6) {
+                                // Bottom-left corner - pile rotated 45deg
+                                cardEl.style.top = `${cascadeOffset}px`;
+                                cardEl.style.left = '50%';
+                                cardEl.style.transform = 'translateX(-50%)';
+                            } else if (i === 7) {
+                                // Bottom pile - no rotation
+                                cardEl.style.top = `${cascadeOffset}px`;
+                                cardEl.style.left = '50%';
+                                cardEl.style.transform = 'translateX(-50%)';
+                            } else if (i === 8) {
+                                // Bottom-right corner - pile rotated -45deg
+                                cardEl.style.top = `${cascadeOffset}px`;
+                                cardEl.style.left = '50%';
+                                cardEl.style.transform = 'translateX(-50%)';
+                            }
+
+                            pileEl.appendChild(cardEl);
+                        });
+
+                        if (pile.length > 1) {
+                            const countEl = document.createElement('div');
+                            countEl.style.cssText = 'position:absolute;top:5px;right:5px;background:rgba(0,0,0,0.7);color:white;padding:4px 8px;border-radius:4px;font-size:12px;font-weight:bold;z-index:1000;';
+                            countEl.textContent = pile.length;
+                            pileEl.appendChild(countEl);
+                        }
+                    }
+
+                    // Highlight logic
+                    pileEl.classList.remove('highlight', 'selected');
+
+                    // Highlight if selected pile
+                    if (state.game.selectedPile === i) {
+                        pileEl.classList.add('selected');
+                    }
+
+                    // Highlight if can place selected card
+                    if (state.game.selectedCard && cards.canPlaceOnPile(state.game.selectedCard, i)) {
+                        pileEl.classList.add('highlight');
+                    }
+
+                    // Highlight if can move selected pile here
+                    if (state.game.selectedPile !== null && state.game.selectedPile !== i) {
+                        const fromPile = state.game.piles[state.game.selectedPile];
+                        if (fromPile.length > 0 && cards.canPlaceOnPile(fromPile[0], i)) {
+                            pileEl.classList.add('highlight');
+                        }
+                    }
+                });
+            },
+
+            renderHand() {
+                dom.playerHand.innerHTML = '';
+                const player = state.game.myPlayer;
+                const hand = state.game.playerHands[player];
+
+                const cardWidth = 85;
+                const isMobile = window.innerWidth <= 768;
+                const overlap = isMobile ? 40 : 40;
+                const gap = isMobile ? 10 : overlap;
+
+                const cardElements = [];
+
+                hand.forEach((card, index) => {
+                    const cardEl = cards.createCardElement(card, () => this.onHandCardClick(card));
+                    cardEl.dataset.cardIndex = index;
+
+                    // Position card in fan
+                    if (isMobile) {
+                        cardEl.style.position = 'absolute';
+                        cardEl.style.left = `${index * (cardWidth - overlap)}px`;
+                        cardEl.style.bottom = '0';
+                    } else {
+                        const totalWidth = hand.length > 0 ? cardWidth + (hand.length - 1) * overlap : 0;
+                        const startX = -totalWidth / 2;
+                        const xPos = startX + (index * overlap);
+                        cardEl.style.left = `calc(50% + ${xPos}px)`;
+                    }
+                    cardEl.style.zIndex = index;
+
+                    if (state.game.selectedCard &&
+                        state.game.selectedCard.rank === card.rank &&
+                        state.game.selectedCard.suit === card.suit) {
+                        cardEl.classList.add('selected');
+                    }
+
+                    // Add macOS dock effect (desktop only)
+                    if (!isMobile) {
+                        const applyDockEffect = (hoverIndex) => {
+                            cardElements.forEach((el, i) => {
+                                const distance = Math.abs(i - hoverIndex);
+                                let scale = 1;
+                                let translateY = 0;
+
+                                if (distance === 0) {
+                                    scale = 1.15;
+                                    translateY = -35;
+                                } else if (distance === 1) {
+                                    scale = 1.08;
+                                    translateY = -15;
+                                } else if (distance === 2) {
+                                    scale = 1.03;
+                                    translateY = -5;
+                                }
+
+                                if (!el.classList.contains('selected')) {
+                                    el.style.transform = `scale(${scale}) translateY(${translateY}px)`;
+                                }
+                            });
+                        };
+
+                        const resetDockEffect = () => {
+                            cardElements.forEach((el) => {
+                                if (!el.classList.contains('selected')) {
+                                    el.style.transform = '';
+                                }
+                            });
+                        };
+
+                        // Desktop: mouse events only
+                        cardEl.addEventListener('mouseenter', () => applyDockEffect(index));
+                        cardEl.addEventListener('mouseleave', resetDockEffect);
+                    }
+
+                    dom.playerHand.appendChild(cardEl);
+                    cardElements.push(cardEl);
+                });
+
+                // Set dynamic width for mobile scrolling
+                if (isMobile && hand.length > 0) {
+                    const totalWidth = (hand.length * cardWidth) - ((hand.length - 1) * overlap);
+                    dom.playerHand.style.width = `${totalWidth}px`;
+                } else {
+                    dom.playerHand.style.width = ''; // Reset for desktop
+                }
+
+                // Global touch handler for swiping through cards
+                dom.playerHand.addEventListener('mouseleave', () => {
+                    cardElements.forEach((el) => {
+                        if (!el.classList.contains('selected')) {
+                            el.style.transform = '';
+                        }
+                    });
+                });
+            },
+
+            onHandCardClick(card) {
+                if (state.game.isMultiplayer && state.game.currentPlayer !== state.game.myPlayer) return;
+
+                // Deselect pile if selecting a card
+                state.game.selectedPile = null;
+
+                state.game.selectedCard = (state.game.selectedCard &&
+                    state.game.selectedCard.rank === card.rank &&
+                    state.game.selectedCard.suit === card.suit) ? null : card;
+
+                this.renderHand();
+                this.renderBoard();
+            },
+
+            onPileClick(pileIndex) {
+                if (state.game.isMultiplayer && state.game.currentPlayer !== state.game.myPlayer) return;
+
+                // If we have a selected card from hand, try to play it
+                if (state.game.selectedCard) {
+                    this.playCard(state.game.selectedCard, pileIndex);
+                    return;
+                }
+
+                // If we have a selected pile, try to move it
+                if (state.game.selectedPile !== null) {
+                    this.movePile(state.game.selectedPile, pileIndex);
+                    return;
+                }
+
+                // Otherwise, select this pile (if it has cards)
+                if (state.game.piles[pileIndex].length > 0) {
+                    state.game.selectedPile = pileIndex;
+                    this.renderBoard();
+                }
+            },
+
+            updateUI() {
+                // Update draw pile state
+                const drawPileEl = document.getElementById('drawPile');
+                if (drawPileEl) {
+                    const countEl = drawPileEl.querySelector('.count');
+                    if (countEl) {
+                        countEl.textContent = state.game.deck.length;
+                    }
+                    drawPileEl.classList.toggle('disabled',
+                        state.game.hasDrawn ||
+                        state.game.deck.length === 0 ||
+                        (state.game.isMultiplayer && state.game.currentPlayer !== state.game.myPlayer)
+                    );
+                }
+
+                dom.endTurnBtn.disabled = state.game.isMultiplayer &&
+                    state.game.currentPlayer !== state.game.myPlayer;
+
+                const info = document.getElementById('playerInfo');
+                info.innerHTML = '';
+                for (let i = 0; i < state.game.activePlayers; i++) {
+                    const playerDiv = document.createElement('div');
+                    playerDiv.className = 'player-card';
+                    if (i === state.game.currentPlayer) playerDiv.classList.add('active');
+
+                    const nameDiv = document.createElement('div');
+                    nameDiv.className = 'player-name';
+                    nameDiv.textContent = state.game.playerNames[i] || `Player ${i + 1}`;
+
+                    const countDiv = document.createElement('div');
+                    countDiv.className = 'card-count';
+                    countDiv.textContent = `${state.game.playerHands[i].length} cards`;
+
+                    playerDiv.appendChild(nameDiv);
+                    playerDiv.appendChild(countDiv);
+                    info.appendChild(playerDiv);
+                }
+            },
+
+            checkWin() {
+                const player = state.game.myPlayer;
+                if (state.game.playerHands[player].length === 0) {
+                    this.showWin(player);
+                    return true;
+                }
+                return false;
+            },
+
+            showWin(winner) {
+                state.game.gameStarted = false;
+                dom.winText.textContent = winner === state.game.myPlayer ? '🎉 You Win!' : '😔 You Lose';
+                utils.playSound(660, 0.5);
+                utils.showModal('win');
+            },
+
+            getPlayerName(playerIndex) {
+                return state.game.playerNames[playerIndex] || `Player ${playerIndex + 1}`;
+            },
+
+            reset() {
+                state.game.gameStarted = false;
+                this.init();
+            }
+        };
+
+        // ==================== NETWORK ====================
+        const network = {
+            connectWebSocket() {
+                state.network.ws = new WebSocket(CONFIG.WS_URL);
+
+                state.network.ws.addEventListener('open', () => {
+                    console.log('✅ WebSocket connected');
+                    state.network.connected = true;
+                });
+
+                state.network.ws.addEventListener('message', async msg => {
+                    try {
+                        const data = JSON.parse(msg.data);
+                        await this.handleMessage(data);
+                    } catch (err) {
+                        console.error('❌ Error:', err);
+                    }
+                });
+
+                state.network.ws.addEventListener('error', err => {
+                    console.error('❌ WebSocket error:', err);
+                    utils.showMessage('Connection error', 'error', 3000);
+                });
+
+                state.network.ws.addEventListener('close', () => {
+                    console.log('❌ Disconnected');
+                    state.network.connected = false;
+                    if (state.game.isMultiplayer && state.game.gameStarted) {
+                        utils.showMessage('Disconnected', 'error', 5000);
+                    }
+                });
+            },
+
+            async handleMessage(data) {
+                switch (data.type) {
+                    case 'roomCreated':
+                        state.network.roomId = data.roomId;
+                        utils.showModal('waiting');
+                        dom.waitingText.textContent = `Room Code: ${data.roomId}`;
+                        break;
+
+                    case 'roomInvalid':
+                        alert(`Room "${data.roomId}" does not exist.`);
+                        utils.showModal('online');
+                        break;
+
+                    case 'roomFull':
+                        alert(`Room "${data.roomId}" is full.`);
+                        utils.showModal('online');
+                        break;
+
+                    case 'roomUpdate':
+                        state.network.roomId = data.roomId;
+                        state.network.isHost = data.isHost || false;
+                        utils.showModal('waiting');
+                        dom.waitingTitle.textContent = `Waiting Room (${data.players.length}/4 players)`;
+
+                        dom.playersList.innerHTML = '';
+                        data.players.forEach(player => {
+                            const div = document.createElement('div');
+                            div.style.cssText = 'padding:8px;margin:5px 0;background:rgba(255,255,255,0.1);border-radius:8px;color:white;display:flex;justify-content:space-between;';
+
+                            const name = document.createElement('span');
+                            name.textContent = `${player.name}${player.name === state.player.name ? ' (You)' : ''}`;
+
+                            const status = document.createElement('span');
+                            status.style.color = player.ready ? '#4CAF50' : '#999';
+                            status.textContent = player.ready ? '✓ Ready' : 'Not Ready';
+
+                            div.appendChild(name);
+                            div.appendChild(status);
+                            dom.playersList.appendChild(div);
+                        });
+
+                        dom.roomPlayers.style.display = 'block';
+                        dom.gameStartControls.style.display = 'block';
+
+                        const readyCount = data.players.filter(p => p.ready).length;
+                        dom.readyStatus.textContent = `${readyCount}/${data.players.length} players ready`;
+
+                        if (data.isPrivate && data.isHost && data.players.length >= data.minPlayers) {
+                            dom.startGameBtn.style.display = 'block';
+                        } else {
+                            dom.startGameBtn.style.display = 'none';
+                        }
+                        break;
+
+                    case 'countdown':
+                        dom.countdownText.textContent = `Game starts in ${data.countdown}s...`;
+                        dom.gameStartControls.style.display = 'block';
+                        break;
+
+                    case 'gameStart':
+                        utils.hideAllModals();
+                        state.game.isMultiplayer = true;
+                        state.game.activePlayers = data.players.length;
+                        state.game.myPlayer = data.myPlayerIndex;
+                        state.network.roomId = data.roomId;
+
+                        data.players.forEach((player, index) => {
+                            state.game.playerNames[index] = player.name;
+                        });
+
+                        if (state.game.myPlayer === 0) {
+                            const deck = cards.createDeck();
+                            network.sendGameAction({ type: 'deckSync', deck: deck });
+                            game.initWithDeck(deck);
+                        } else {
+                            state.game.waitingForDeck = true;
+                        }
+                        break;
+
+                    case 'gameAction':
+                        const action = data.action;
+
+                        if (action.type === 'deckSync' && state.game.waitingForDeck) {
+                            game.initWithDeck(action.deck);
+                            state.game.waitingForDeck = false;
+                        }
+
+                        if (action.type === 'play') {
+                            const hand = state.game.playerHands[action.player];
+                            const idx = hand.findIndex(c => c.rank === action.card.rank && c.suit === action.card.suit);
+                            if (idx !== -1) hand.splice(idx, 1);
+
+                            state.game.piles[action.pile].push(action.card);
+                            utils.playSound(440, 0.1);
+                            game.renderBoard();
+                            game.updateUI();
+                            game.checkWin();
+                        }
+
+                        if (action.type === 'draw') {
+                            if (state.game.deck.length > 0) {
+                                const card = state.game.deck.pop();
+                                state.game.playerHands[action.player].push(card);
+                                utils.playSound(330, 0.1);
+                                game.updateUI();
+                            }
+                        }
+
+                        if (action.type === 'movePile') {
+                            const fromPile = state.game.piles[action.from];
+                            state.game.piles[action.to].push(...fromPile);
+                            state.game.piles[action.from] = [];
+                            utils.playSound(440, 0.1);
+                            game.renderBoard();
+                            game.updateUI();
+                        }
+
+                        if (action.type === 'endTurn') {
+                            state.game.currentPlayer = action.nextPlayer;
+                            state.game.hasDrawn = false;
+                            state.game.hasPlayed = false;
+                            game.updateUI();
+                            utils.showMessage(`${game.getPlayerName(action.nextPlayer)}'s turn`, 'info');
+                        }
+                        break;
+
+                    case 'rematchUpdate':
+                        if (state.game.isMultiplayer) {
+                            dom.rematchPlayers.style.display = 'block';
+                            dom.rematchList.innerHTML = '';
+
+                            data.players.forEach(player => {
+                                const div = document.createElement('div');
+                                div.style.cssText = 'padding:8px;margin:5px 0;background:rgba(255,255,255,0.1);border-radius:8px;display:flex;justify-content:space-between;';
+
+                                const name = document.createElement('span');
+                                name.textContent = player.name;
+
+                                const status = document.createElement('span');
+                                status.style.color = player.wantsRematch ? '#4CAF50' : '#999';
+                                status.textContent = player.wantsRematch ? '✓ Ready' : 'Waiting...';
+
+                                div.appendChild(name);
+                                div.appendChild(status);
+                                dom.rematchList.appendChild(div);
+                            });
+
+                            const readyCount = data.players.filter(p => p.wantsRematch).length;
+                            dom.rematchStatus.textContent = `${readyCount}/${data.players.length} players ready for rematch`;
+                        }
+                        break;
+
+                    case 'rematchStart':
+                        game.reset();
+                        utils.hideAllModals();
+                        dom.buttons.rematch.disabled = false;
+                        dom.buttons.rematch.textContent = 'Play Again';
+                        break;
+
+                    case 'playerLeft':
+                        if (data.playerIndex !== undefined && state.game.gameStarted) {
+                            const playerName = state.game.playerNames[data.playerIndex] || `Player ${data.playerIndex + 1}`;
+                            utils.showMessage(`${playerName} left the game`, 'error', 3000);
+                            state.game.playerHands[data.playerIndex] = [];
+                            game.updateUI();
+                        }
+                        break;
+
+                    case 'playerDisconnected':
+                        utils.showMessage(`A player disconnected (${data.playersRemaining} remaining)`, 'error', 3000);
+                        break;
+
+                    case 'serverShutdown':
+                        utils.showMessage('Server is shutting down', 'error', 5000);
+                        setTimeout(() => {
+                            utils.showModal('startup');
+                            state.game.gameStarted = false;
+                        }, 2000);
+                        break;
+
+                    case 'connected':
+                        console.log('✅ Server acknowledged connection');
+                        break;
+                }
+            },
+
+            sendGameAction(action) {
+                if (state.network.ws && state.network.ws.readyState === WebSocket.OPEN) {
+                    state.network.ws.send(JSON.stringify({
+                        type: 'gameAction',
+                        action: action
+                    }));
+                }
+            },
+
+            cleanup() {
+                if (state.network.ws) {
+                    state.network.ws.close();
+                    state.network.ws = null;
+                }
+            }
+        };
+
+        // ==================== EVENT LISTENERS ====================
+        dom.buttons.online.addEventListener('click', () => utils.showModal('online'));
+        dom.buttons.back.addEventListener('click', () => utils.showModal('startup'));
+        dom.buttons.private.addEventListener('click', () => utils.showModal('private'));
+        dom.buttons.backToOnline.addEventListener('click', () => utils.showModal('online'));
+
+        dom.buttons.public.addEventListener('click', () => {
+            const name = dom.inputs.name.value.trim();
+            if (!name) {
+                alert('Please enter your name');
+                return;
+            }
+            state.player.name = name;
+            utils.showModal('waiting');
+            dom.waitingText.textContent = 'Finding a game...';
+            network.connectWebSocket();
+            state.network.ws.addEventListener('open', () => {
+                state.network.ws.send(JSON.stringify({ type: 'joinPublic', displayName: name }));
+            });
+        });
+
+        dom.buttons.createPrivate.addEventListener('click', () => {
+            const name = dom.inputs.name.value.trim();
+            if (!name) {
+                alert('Please enter your name');
+                return;
+            }
+            state.player.name = name;
+            const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+            utils.showModal('waiting');
+            dom.waitingText.innerHTML = `Room Code: <strong>${roomId}</strong><br><small>Share this code with friends!</small>`;
+            network.connectWebSocket();
+            state.network.ws.addEventListener('open', () => {
+                state.network.ws.send(JSON.stringify({ type: 'createPrivate', roomId, displayName: name }));
+            });
+        });
+
+        dom.buttons.joinPrivate.addEventListener('click', () => {
+            const name = dom.inputs.name.value.trim();
+            const roomId = dom.inputs.room.value.trim().toUpperCase();
+            if (!name || !roomId) {
+                alert('Please enter both name and room code');
+                return;
+            }
+            state.player.name = name;
+            utils.showModal('waiting');
+            dom.waitingText.textContent = `Joining room ${roomId}...`;
+            network.connectWebSocket();
+            state.network.ws.addEventListener('open', () => {
+                state.network.ws.send(JSON.stringify({ type: 'joinPrivate', roomId, displayName: name }));
+            });
+        });
+
+        dom.buttons.rematch.addEventListener('click', () => {
+            if (state.game.isMultiplayer) {
+                if (state.network.ws && state.network.ws.readyState === WebSocket.OPEN) {
+                    state.network.ws.send(JSON.stringify({ type: 'rematchVote', roomId: state.network.roomId }));
+                    dom.buttons.rematch.disabled = true;
+                    dom.buttons.rematch.textContent = 'Waiting for others...';
+                }
+            } else {
+                game.reset();
+                utils.hideAllModals();
+            }
+        });
+
+        dom.buttons.menu.addEventListener('click', () => {
+            if (state.game.isMultiplayer && state.network.ws && state.network.ws.readyState === WebSocket.OPEN) {
+                state.network.ws.send(JSON.stringify({ type: 'leaveRoom', roomId: state.network.roomId }));
+            }
+            network.cleanup();
+            utils.showModal('startup');
+            state.game.gameStarted = false;
+        });
+
+        dom.readyBtn.addEventListener('click', () => {
+            if (state.network.ws && state.network.ws.readyState === WebSocket.OPEN) {
+                state.network.ws.send(JSON.stringify({ type: 'playerReady', roomId: state.network.roomId }));
+                dom.readyBtn.disabled = true;
+                dom.readyBtn.textContent = 'Waiting for others...';
+            }
+        });
+
+        dom.startGameBtn.addEventListener('click', () => {
+            if (state.network.ws && state.network.ws.readyState === WebSocket.OPEN) {
+                state.network.ws.send(JSON.stringify({ type: 'startGame', roomId: state.network.roomId }));
+            }
+        });
+
+        dom.endTurnBtn.addEventListener('click', () => game.endTurn());
+        dom.drawPile.addEventListener('click', () => game.drawCard());
+
+        dom.helpBtn.addEventListener('click', () => utils.showModal('rules'));
+        dom.buttons.closeRules.addEventListener('click', () => utils.hideAllModals());
+
+        dom.muteBtn.addEventListener('click', () => {
+            state.audio.muted = !state.audio.muted;
+            dom.muteBtn.textContent = state.audio.muted ? '🔇' : '🔊';
+        });
+
+        // Deselect card when clicking outside of hand
+        document.addEventListener('click', (e) => {
+            // Don't deselect if clicking on a card in hand or on a pile
+            if (!e.target.closest('#playerHand') &&
+                !e.target.closest('.pile') &&
+                !e.target.closest('#drawPile') &&
+                state.game.selectedCard) {
+                state.game.selectedCard = null;
+                state.game.selectedPile = null;
+                game.renderHand();
+                game.renderBoard();
+            }
+        }, true);  // Add true for capture phase
+
+        console.log('👑 King in the Corner loaded!');
+    </script>
+</body>
+
+</html>
