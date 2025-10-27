@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -146,7 +145,7 @@
         .card.black {
             color: #2c3e50;
         }
-        
+
         .card[draggable="true"] {
             cursor: move;
         }
@@ -154,7 +153,7 @@
         .card[draggable="true"]:active {
             cursor: grabbing;
         }
-        
+
         .card-top {
             display: flex;
             flex-direction: row;
@@ -342,6 +341,45 @@
             font-size: 16px;
             font-weight: bold;
             margin-top: 5px;
+        }
+
+        /* Card Reorder Buttons */
+        .card-controls {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 70px;
+            z-index: 102;
+            pointer-events: auto;
+        }
+
+        .card-control-btn {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: 2px solid #ffd700;
+            border-radius: 50%;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            transition: all 0.2s;
+        }
+
+        .card-control-btn:active {
+            transform: scale(0.9);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-control-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
         }
 
         /* Message Display */
@@ -629,7 +667,6 @@
         }
     </style>
 </head>
-
 <body>
     <div id="container">
         <div id="gameArea">
@@ -747,7 +784,8 @@
 
             <h3>🃏 Playing Cards</h3>
             <ul>
-                <li><strong>Foundation Piles:</strong> Play cards in descending order, alternating colors (e.g., Red 8 on Black 9, Black 7 on Red 8)</li>
+                <li><strong>Foundation Piles:</strong> Play cards in descending order, alternating colors (e.g., Red 8
+                    on Black 9, Black 7 on Red 8)</li>
                 <li><strong>Empty Foundations:</strong> Any card except Kings can start a foundation pile</li>
                 <li><strong>Card Rank:</strong> K (high) → Q → J → 10 → 9 → 8 → 7 → 6 → 5 → 4 → 3 → 2 → A (low)</li>
             </ul>
@@ -763,7 +801,8 @@
             <h3>🔄 Moving Piles</h3>
             <ul>
                 <li>Click a pile to select it, then click another pile to move it</li>
-                <li>You can move an entire pile onto another pile if the bottom card of the moving pile can legally play on the top card of the destination</li>
+                <li>You can move an entire pile onto another pile if the bottom card of the moving pile can legally play
+                    on the top card of the destination</li>
                 <li>This is a powerful strategy to clear foundation piles!</li>
             </ul>
 
@@ -775,7 +814,6 @@
         </div>
         <button id="closeRulesBtn">Got it!</button>
     </div>
-
     <script>
         // ==================== CONFIGURATION ====================
         const CONFIG = {
@@ -1291,19 +1329,23 @@
                 const player = state.game.myPlayer;
                 const hand = state.game.playerHands[player];
 
-                const cardWidth = 85;
                 const isMobile = window.innerWidth <= 768;
+                const cardWidth = isMobile ? 65 : 85;
                 const overlap = isMobile ? 40 : 40;
-                const gap = isMobile ? 10 : overlap;
 
                 const cardElements = [];
-                let draggedCard = null;
                 let draggedIndex = null;
+                let draggedElement = null;
+                let currentDropIndex = null;
 
                 hand.forEach((card, index) => {
                     const cardEl = cards.createCardElement(card, () => this.onHandCardClick(card));
                     cardEl.dataset.cardIndex = index;
-                    cardEl.draggable = true;
+
+                    // Only make draggable on desktop
+                    if (!isMobile) {
+                        cardEl.draggable = true;
+                    }
 
                     // Position card in fan
                     if (isMobile) {
@@ -1318,47 +1360,82 @@
                     }
                     cardEl.style.zIndex = index;
 
-                    if (state.game.selectedCard &&
+                    const isSelected = state.game.selectedCard &&
                         state.game.selectedCard.rank === card.rank &&
-                        state.game.selectedCard.suit === card.suit) {
+                        state.game.selectedCard.suit === card.suit;
+
+                    if (isSelected) {
                         cardEl.classList.add('selected');
+
+                        // Add move buttons ONLY on mobile
+                        if (isMobile) {
+                            const controlsDiv = document.createElement('div');
+                            controlsDiv.className = 'card-controls';
+
+                            const leftBtn = document.createElement('button');
+                            leftBtn.className = 'card-control-btn';
+                            leftBtn.innerHTML = '←';
+                            leftBtn.disabled = index === 0;
+                            leftBtn.onclick = (e) => {
+                                e.stopPropagation();
+                                this.moveCardInHand(index, index - 1);
+                            };
+
+                            const rightBtn = document.createElement('button');
+                            rightBtn.className = 'card-control-btn';
+                            rightBtn.innerHTML = '→';
+                            rightBtn.disabled = index === hand.length - 1;
+                            rightBtn.onclick = (e) => {
+                                e.stopPropagation();
+                                this.moveCardInHand(index, index + 1);
+                            };
+
+                            controlsDiv.appendChild(leftBtn);
+                            controlsDiv.appendChild(rightBtn);
+                            cardEl.appendChild(controlsDiv);
+                        }
                     }
 
-                    // Drag and drop event handlers
-                    cardEl.addEventListener('dragstart', (e) => {
-                        draggedCard = card;
-                        draggedIndex = index;
-                        cardEl.style.opacity = '0.5';
-                        e.dataTransfer.effectAllowed = 'move';
-                    });
+                    // Desktop drag events
+                    if (!isMobile) {
+                        // Drag and drop event handlers
+                        cardEl.addEventListener('dragstart', (e) => {
+                            draggedCard = card;
+                            draggedIndex = index;
+                            cardEl.style.opacity = '0.5';
+                            e.dataTransfer.effectAllowed = 'move';
+                        });
 
-                    cardEl.addEventListener('dragend', (e) => {
-                        cardEl.style.opacity = '1';
-                        draggedCard = null;
-                        draggedIndex = null;
-                    });
+                        cardEl.addEventListener('dragend', (e) => {
+                            cardEl.style.opacity = '1';
+                            draggedCard = null;
+                            draggedIndex = null;
+                        });
 
-                    cardEl.addEventListener('dragover', (e) => {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = 'move';
-                    });
+                        cardEl.addEventListener('dragover', (e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                        });
 
-                    cardEl.addEventListener('drop', (e) => {
-                        e.preventDefault();
-                        if (draggedCard && draggedIndex !== null && draggedIndex !== index) {
-                            // Reorder the hand
-                            const newHand = [...hand];
-                            newHand.splice(draggedIndex, 1);
-                            newHand.splice(index, 0, draggedCard);
-                            state.game.playerHands[player] = newHand;
-                            this.renderHand();
-                        }
-                    });
+                        cardEl.addEventListener('drop', (e) => {
+                            e.preventDefault();
+                            if (draggedCard && draggedIndex !== null && draggedIndex !== index) {
+                                // Reorder the hand
+                                const newHand = [...hand];
+                                newHand.splice(draggedIndex, 1);
+                                newHand.splice(index, 0, draggedCard);
+                                state.game.playerHands[player] = newHand;
+                                this.renderHand();
+                            }
+                        });
+                    }
 
                     // Add macOS dock effect (desktop only)
                     if (!isMobile) {
                         const applyDockEffect = (hoverIndex) => {
                             cardElements.forEach((el, i) => {
+                                if (i === draggedIndex) return;
+
                                 const distance = Math.abs(i - hoverIndex);
                                 let scale = 1;
                                 let translateY = 0;
@@ -1382,13 +1459,13 @@
 
                         const resetDockEffect = () => {
                             cardElements.forEach((el) => {
+                                if (el === draggedElement) return;
                                 if (!el.classList.contains('selected')) {
                                     el.style.transform = '';
                                 }
                             });
                         };
 
-                        // Desktop: mouse events only
                         cardEl.addEventListener('mouseenter', () => applyDockEffect(index));
                         cardEl.addEventListener('mouseleave', resetDockEffect);
                     }
@@ -1401,8 +1478,14 @@
                 if (isMobile && hand.length > 0) {
                     const totalWidth = (hand.length * cardWidth) - ((hand.length - 1) * overlap);
                     dom.playerHand.style.width = `${totalWidth}px`;
+
+                    // Scroll container to center
+                    requestAnimationFrame(() => {
+                        const container = dom.playerHandContainer;
+                        container.scrollLeft = container.scrollWidth / 2 - container.clientWidth / 2;
+                    });
                 } else {
-                    dom.playerHand.style.width = ''; // Reset for desktop
+                    dom.playerHand.style.width = '';
                 }
 
                 // Global touch handler for swiping through cards
@@ -1415,15 +1498,38 @@
                 });
             },
 
+            moveCardInHand(fromIndex, toIndex) {
+                const player = state.game.myPlayer;
+                const hand = state.game.playerHands[player];
+
+                if (toIndex < 0 || toIndex >= hand.length) return;
+
+                // Swap the cards
+                const newHand = [...hand];
+                [newHand[fromIndex], newHand[toIndex]] = [newHand[toIndex], newHand[fromIndex]];
+                state.game.playerHands[player] = newHand;
+
+                // Update the selected card reference to maintain selection
+                const selectedCard = state.game.selectedCard;
+
+                // Play a subtle sound
+                utils.playSound(500, 0.05);
+
+                this.renderHand();
+
+                // Restore selection
+                state.game.selectedCard = selectedCard;
+            },
+
             onHandCardClick(card) {
-                if (state.game.isMultiplayer && state.game.currentPlayer !== state.game.myPlayer) return;
-                
-                // Can't play cards until you've drawn
-                if (!state.game.hasDrawn) {
-                    utils.showMessage('Draw a card first!', 'error');
-                    return;
-                }
-                
+                // if (state.game.isMultiplayer && state.game.currentPlayer !== state.game.myPlayer) return;
+
+                // // Can't play cards until you've drawn
+                // if (!state.game.hasDrawn) {
+                //     utils.showMessage('Draw a card first!', 'error');
+                //     return;
+                // }
+
                 // Deselect pile if selecting a card
                 state.game.selectedPile = null;
 
@@ -1437,13 +1543,13 @@
 
             onPileClick(pileIndex) {
                 if (state.game.isMultiplayer && state.game.currentPlayer !== state.game.myPlayer) return;
-                
+
                 // Can't interact with piles until you've drawn
                 if (!state.game.hasDrawn) {
                     utils.showMessage('Draw a card first!', 'error');
                     return;
                 }
-                
+
                 // If we have a selected card from hand, try to play it
                 if (state.game.selectedCard) {
                     this.playCard(state.game.selectedCard, pileIndex);
