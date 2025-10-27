@@ -727,35 +727,42 @@
                 <li>Each player starts with 7 cards</li>
                 <li>4 foundation piles are dealt in the center (North, South, East, West)</li>
                 <li>4 corner positions start empty</li>
+                <li>Remaining cards form the draw pile in the center</li>
             </ul>
 
-            <h3>📋 Rules</h3>
+            <h3>📋 Turn Sequence</h3>
             <ul>
-                <li><strong>Foundation Piles:</strong> Play cards in descending order, alternating colors (e.g., Red 8
-                    on Black 9)</li>
-                <li><strong>Corner Piles:</strong> Start with a King, then build down alternating colors</li>
-                <li><strong>Draw:</strong> If you can't play, draw one card from the deck</li>
-                <li><strong>End Turn:</strong> Click "End Turn" when you're done playing</li>
+                <li><strong>1. Draw:</strong> You MUST draw one card from the deck to start your turn</li>
+                <li><strong>2. Play:</strong> Make as many valid plays as you can</li>
+                <li><strong>3. End Turn:</strong> Click "End Turn" when you're done</li>
             </ul>
 
-            <h3>👑 Kings</h3>
+            <h3>🃏 Playing Cards</h3>
+            <ul>
+                <li><strong>Foundation Piles:</strong> Play cards in descending order, alternating colors (e.g., Red 8 on Black 9, Black 7 on Red 8)</li>
+                <li><strong>Empty Foundations:</strong> Any card except Kings can start a foundation pile</li>
+                <li><strong>Card Rank:</strong> K (high) → Q → J → 10 → 9 → 8 → 7 → 6 → 5 → 4 → 3 → 2 → A (low)</li>
+            </ul>
+
+            <h3>👑 Kings & Corners</h3>
             <ul>
                 <li>Kings can ONLY be played in the 4 corner positions</li>
-                <li>Once a King is in a corner, build down from it (alternating colors)</li>
-                <li>Playing a King in a corner is a powerful move!</li>
+                <li>Kings can ONLY start a corner pile (corners must be empty)</li>
+                <li>Once a King is in a corner, build down from it in alternating colors</li>
+                <li>Playing a King opens up a valuable new pile!</li>
             </ul>
 
-            <h3>🎲 Gameplay</h3>
+            <h3>🔄 Moving Piles</h3>
             <ul>
-                <li>On your turn, play as many cards as possible</li>
-                <li>You can move entire piles onto other valid piles</li>
-                <li>If you play all your cards, you win!</li>
-                <li>If you can't play, draw a card and end your turn</li>
+                <li>Click a pile to select it, then click another pile to move it</li>
+                <li>You can move an entire pile onto another pile if the bottom card of the moving pile can legally play on the top card of the destination</li>
+                <li>This is a powerful strategy to clear foundation piles!</li>
             </ul>
 
             <h3>🏆 Winning</h3>
             <ul>
                 <li>First player to empty their hand wins!</li>
+                <li>Strategy tip: Try to create multiple piles to have more play options</li>
             </ul>
         </div>
         <button id="closeRulesBtn">Got it!</button>
@@ -1139,7 +1146,7 @@
                     network.sendGameAction({ type: 'endTurn', nextPlayer: state.game.currentPlayer });
                 }
 
-                utils.showMessage(`${this.getPlayerName(state.game.currentPlayer)}'s turn`, 'info');
+                utils.showMessage(`${this.getPlayerName(state.game.currentPlayer)}'s turn - Draw a card!`, 'info');
             },
 
             renderBoard() {
@@ -1368,7 +1375,13 @@
 
             onHandCardClick(card) {
                 if (state.game.isMultiplayer && state.game.currentPlayer !== state.game.myPlayer) return;
-
+                
+                // Can't play cards until you've drawn
+                if (!state.game.hasDrawn) {
+                    utils.showMessage('Draw a card first!', 'error');
+                    return;
+                }
+                
                 // Deselect pile if selecting a card
                 state.game.selectedPile = null;
 
@@ -1382,7 +1395,13 @@
 
             onPileClick(pileIndex) {
                 if (state.game.isMultiplayer && state.game.currentPlayer !== state.game.myPlayer) return;
-
+                
+                // Can't interact with piles until you've drawn
+                if (!state.game.hasDrawn) {
+                    utils.showMessage('Draw a card first!', 'error');
+                    return;
+                }
+                
                 // If we have a selected card from hand, try to play it
                 if (state.game.selectedCard) {
                     this.playCard(state.game.selectedCard, pileIndex);
@@ -1417,8 +1436,9 @@
                     );
                 }
 
-                dom.endTurnBtn.disabled = state.game.isMultiplayer &&
-                    state.game.currentPlayer !== state.game.myPlayer;
+                // Disable End Turn until draw happens
+                dom.endTurnBtn.disabled = !state.game.hasDrawn ||
+                    (state.game.isMultiplayer && state.game.currentPlayer !== state.game.myPlayer);
 
                 const info = document.getElementById('playerInfo');
                 info.innerHTML = '';
@@ -1820,5 +1840,4 @@
         console.log('👑 King in the Corner loaded!');
     </script>
 </body>
-
 </html>
