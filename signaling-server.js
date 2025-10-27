@@ -22,7 +22,9 @@ const CONFIG = {
   PORT: process.env.PORT || 3001,
   PING_INTERVAL: 30000,
   MAX_PLAYERS: 4,
-  MIN_PLAYERS: 2
+  MIN_PLAYERS: 2,
+  READY_TIMEOUT: 60000,
+  ALONE_TIMEOUT: 30000
 };
 
 // ==================== STATE ====================
@@ -56,6 +58,11 @@ const utils = {
 
     const { roomId } = connData;
 
+    // Clear any player timeouts
+    if (connData.readyTimeout) {
+      clearTimeout(connData.readyTimeout);
+    }
+
     // Remove from public queue
     const queueIndex = state.publicQueue.indexOf(ws);
     if (queueIndex !== -1) {
@@ -72,6 +79,16 @@ const utils = {
 
         // Remove player from room
         room.players = room.players.filter(p => p !== ws);
+
+        // Check if remaining player is now alone
+        if (room.players.length === 1 && !room.gameStarted) {
+          const remainingPlayer = room.players[0];
+          room.aloneTimeout = setTimeout(() => {
+            if (room.players.length === 1 && !room.gameStarted) {
+              utils.kickPlayerForInactivity(remainingPlayer, roomId, 'alone');
+            }
+          }, CONFIG.ALONE_TIMEOUT);
+        }
 
         // Notify remaining players
         room.players.forEach(player => {
@@ -100,6 +117,9 @@ const utils = {
           }
           if (room.startTimeout) {
             clearTimeout(room.startTimeout);
+          }
+          if (room.aloneTimeout) {
+            clearTimeout(room.aloneTimeout);
           }
           state.privateRooms.delete(roomId);
           console.log(`🗑️  Room ${roomId} cleaned up`);
@@ -135,6 +155,19 @@ const utils = {
 
   startGame(roomId, room) {
     room.gameStarted = true;
+
+    // Clear all timeouts when game starts
+    if (room.aloneTimeout) {
+      clearTimeout(room.aloneTimeout);
+      room.aloneTimeout = null;
+    }
+    room.players.forEach(player => {
+      const connData = state.connections.get(player);
+      if (connData?.readyTimeout) {
+        clearTimeout(connData.readyTimeout);
+        connData.readyTimeout = null;
+      }
+    });
 
     const playersList = room.players.map((p, index) => {
       const pData = state.connections.get(p);
@@ -199,6 +232,73 @@ const utils = {
         });
       }
     });
+  },
+
+  kickPlayerForInactivity(ws, roomId, reason) {
+    const room = state.privateRooms.get(roomId);
+    if (!room) return;
+
+    const connData = state.connections.get(ws);
+    const displayName = connData?.displayName || 'Player';
+
+    console.log(`⏱️  Kicking ${displayName} from room ${roomId}: ${reason}`);
+
+    // Send kick message to player
+    this.sendToClient(ws, {
+      type: 'kicked',
+      reason: reason === 'alone'
+        ? 'No other players joined'
+        : 'Did not ready up in time'
+    });
+
+    // Close connection after a brief delay
+    setTimeout(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    }, 1000);
+  },
+
+  setupPlayerTimeouts(ws, roomId, room) {
+    const connData = state.connections.get(ws);
+    if (!connData) return;
+
+    // Set ready timeout for this player
+    connData.readyTimeout = setTimeout(() => {
+      if (!room.readyPlayers.has(ws) && !room.gameStarted) {
+        this.kickPlayerForInactivity(ws, roomId, 'not ready');
+      }
+    }, CONFIG.READY_TIMEOUT);
+
+    // If player is alone, set alone timeout
+    if (room.players.length === 1) {
+      room.aloneTimeout = setTimeout(() => {
+        if (room.players.length === 1 && !room.gameStarted) {
+          this.kickPlayerForInactivity(ws, roomId, 'alone');
+        }
+      }, CONFIG.ALONE_TIMEOUT);
+    } else if (room.aloneTimeout) {
+      // Clear alone timeout if someone joined
+      clearTimeout(room.aloneTimeout);
+      room.aloneTimeout = null;
+    }
+
+    state.connections.set(ws, connData);
+  },
+
+  clearPlayerTimeouts(ws, roomId) {
+    const connData = state.connections.get(ws);
+    if (connData?.readyTimeout) {
+      clearTimeout(connData.readyTimeout);
+      connData.readyTimeout = null;
+      state.connections.set(ws, connData);
+    }
+
+    const room = state.privateRooms.get(roomId);
+    if (room?.aloneTimeout) {
+      clearTimeout(room.aloneTimeout);
+      room.aloneTimeout = null;
+    }
   }
 };
 
@@ -231,6 +331,8 @@ const handlers = {
       room.players.push(ws);
       connData.roomId = roomId;
       state.connections.set(ws, connData);
+
+      utils.setupPlayerTimeouts(ws, roomId, room);
 
       console.log(`🎮 ${displayName} joined room ${roomId} (${room.players.length}/${CONFIG.MAX_PLAYERS})`);
 
@@ -271,6 +373,8 @@ const handlers = {
       connData.roomId = roomId;
       state.connections.set(ws, connData);
 
+      utils.setupPlayerTimeouts(ws, roomId, room);
+
       utils.broadcastRoomUpdate(roomId, room);
       console.log(`🆕 Created new public room ${roomId}`);
     }
@@ -299,6 +403,8 @@ const handlers = {
 
     state.privateRooms.set(roomId, room);
     state.connections.set(ws, { roomId, isPrivate: true, displayName });
+
+    utils.setupPlayerTimeouts(ws, roomId, room);
 
     utils.sendToClient(ws, {
       type: 'roomCreated',
@@ -335,6 +441,8 @@ const handlers = {
     room.players.push(ws);
     state.connections.set(ws, { roomId, isPrivate: true, displayName });
 
+    utils.setupPlayerTimeouts(ws, roomId, room);
+
     console.log(`🎮 ${displayName} joined private room: ${roomId} (${room.players.length}/${CONFIG.MAX_PLAYERS})`);
 
     utils.broadcastRoomUpdate(roomId, room);
@@ -364,6 +472,8 @@ const handlers = {
 
     const room = state.privateRooms.get(connData.roomId);
     if (!room) return;
+
+    utils.clearPlayerTimeouts(ws, connData.roomId);
 
     room.readyPlayers.add(ws);
     console.log(`✓ Player ready in room ${connData.roomId} (${room.readyPlayers.size}/${room.players.length})`);
