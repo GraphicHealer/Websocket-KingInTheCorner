@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>King in the Corner - Multiplayer</title>
     <style>
+        /* ==================== RESET & BASE ==================== */
         * {
             margin: 0;
             padding: 0;
@@ -18,6 +19,7 @@
             background: linear-gradient(135deg, #2c5f2d 0%, #97bc62 100%);
         }
 
+        /* ==================== LAYOUT ==================== */
         #container {
             display: flex;
             flex-direction: column;
@@ -30,68 +32,36 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
-            padding-bottom: 180px;
-            /* Account for player hand */
+            padding: 20px 20px 180px; /* Extra bottom padding for player hand */
             overflow: hidden;
         }
 
-        /* 3x3 Game Board */
+        /* ==================== GAME BOARD ==================== */
         #gameBoard {
             display: grid;
             grid-template-columns: repeat(3, 120px);
             grid-template-rows: repeat(3, 120px);
             gap: 15px;
-            position: relative;
             place-items: center;
             max-width: 100vw;
             max-height: calc(100vh - 200px);
         }
 
+        /* ==================== PILES ==================== */
         .pile {
+            width: 90px;
+            height: 125px;
             background: rgba(255, 255, 255, 0.15);
             border: 3px dashed rgba(255, 255, 255, 0.4);
             border-radius: 10px;
-            position: relative;
+            padding: 5px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
+            overflow: visible;
             cursor: pointer;
             transition: all 0.2s;
-            width: 90px;
-            height: 125px;
-            padding: 5px;
-            overflow: visible;
-        }
-
-        /* Pile rotations */
-        .pile[data-pile="0"] {
-            transform: rotate(-225deg);
-        }
-
-        .pile[data-pile="1"] {
-            transform: rotate(180deg);
-        }
-
-        .pile[data-pile="2"] {
-            transform: rotate(225deg);
-        }
-
-        .pile[data-pile="3"] {
-            transform: rotate(90deg);
-        }
-
-        .pile[data-pile="5"] {
-            transform: rotate(-90deg);
-        }
-
-        .pile[data-pile="6"] {
-            transform: rotate(45deg);
-        }
-
-        .pile[data-pile="8"] {
-            transform: rotate(-45deg);
         }
 
         .pile:hover {
@@ -107,8 +77,7 @@
 
         .pile.selected {
             background: rgba(100, 149, 237, 0.3);
-            border-color: #6495ED;
-            border-style: solid;
+            border: 3px solid #6495ED;
             box-shadow: 0 0 20px rgba(100, 149, 237, 0.6);
         }
 
@@ -116,53 +85,53 @@
             background: rgba(255, 215, 0, 0.1);
         }
 
-        /* Card Styling */
+        /* Pile rotations for visual layout */
+        .pile[data-pile="0"] { transform: rotate(-225deg); }
+        .pile[data-pile="1"] { transform: rotate(180deg); }
+        .pile[data-pile="2"] { transform: rotate(225deg); }
+        .pile[data-pile="3"] { transform: rotate(90deg); }
+        .pile[data-pile="5"] { transform: rotate(-90deg); }
+        .pile[data-pile="6"] { transform: rotate(45deg); }
+        .pile[data-pile="8"] { transform: rotate(-45deg); }
+
+        /* ==================== CARDS ==================== */
         .card {
             width: 85px;
             height: 120px;
+            padding: 6px;
             background: white;
             border-radius: 6px;
             display: flex;
             flex-direction: column;
             align-items: flex-start;
             justify-content: space-between;
-            padding: 6px;
             font-size: 16px;
             font-weight: bold;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            transition: transform 0.2s;
             cursor: pointer;
-            position: relative;
+            transition: transform 0.2s;
         }
 
         .card:hover {
             transform: translateY(-5px);
         }
 
-        .card.red {
-            color: #e74c3c;
-        }
+        .card.red { color: #e74c3c; }
+        .card.black { color: #2c3e50; }
 
-        .card.black {
-            color: #2c3e50;
-        }
+        .card[draggable="true"] { cursor: move; }
+        .card[draggable="true"]:active { cursor: grabbing; }
 
-        .card-top {
+        .card-top,
+        .card-bottom {
             display: flex;
-            flex-direction: row;
             align-items: center;
             gap: 2px;
-            line-height: 1;
             font-size: 18px;
+            line-height: 1;
         }
 
         .card-bottom {
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            gap: 2px;
-            line-height: 1;
-            font-size: 18px;
             transform: rotate(180deg);
             align-self: flex-end;
         }
@@ -176,7 +145,7 @@
             opacity: 0.3;
         }
 
-        /* Draw Pile */
+        /* ==================== DRAW PILE ==================== */
         #drawPile {
             position: absolute;
             top: 50%;
@@ -210,21 +179,21 @@
             font-weight: bold;
         }
 
-        /* Player Hand */
+        /* ==================== PLAYER HAND ==================== */
         #playerHandContainer {
             position: fixed;
             bottom: 20px;
             left: 0;
             width: 100vw;
             height: 200px;
+            padding-top: 35px;
             overflow-x: auto;
             overflow-y: visible;
-            z-index: 10;
             -webkit-overflow-scrolling: touch;
-            padding-top: 35px;
-            pointer-events: none;
             scrollbar-width: none;
             -ms-overflow-style: none;
+            pointer-events: none;
+            z-index: 10;
         }
 
         #playerHandContainer::-webkit-scrollbar {
@@ -232,22 +201,18 @@
         }
 
         #playerHand {
-            pointer-events: none;
-            position: relative;
-            bottom: auto;
-            left: auto;
-            transform: none;
             display: flex;
             justify-content: center;
             align-items: flex-end;
             height: 140px;
             overflow: visible;
+            pointer-events: none;
         }
 
         #playerHand .card {
-            pointer-events: auto;
             position: absolute;
             bottom: 0;
+            pointer-events: auto;
             transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
@@ -258,38 +223,12 @@
 
         #playerHand .card.selected {
             transform: translateY(-40px) scale(1.05);
-            box-shadow: 0 8px 20px rgba(255, 215, 0, 0.6);
             border: 3px solid #ffd700;
+            box-shadow: 0 8px 20px rgba(255, 215, 0, 0.6);
             z-index: 101;
         }
 
-        /* End Turn Button in Player Info */
-        #endTurnBtn {
-            padding: 12px 20px;
-            font-size: 16px;
-            font-weight: bold;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            width: 100%;
-            margin-top: 8px;
-        }
-
-        #endTurnBtn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
-        }
-
-        #endTurnBtn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* Player Info Container */
+        /* ==================== PLAYER INFO ==================== */
         #playerInfoContainer {
             position: fixed;
             right: 20px;
@@ -309,17 +248,17 @@
         }
 
         .player-card {
+            padding: 12px 16px;
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(10px);
-            padding: 12px 16px;
-            border-radius: 8px;
             border: 2px solid transparent;
+            border-radius: 8px;
             transition: all 0.3s;
         }
 
         .player-card.active {
-            border-color: #ffd700;
             background: rgba(255, 215, 0, 0.2);
+            border-color: #ffd700;
             box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
         }
 
@@ -336,64 +275,103 @@
             margin-top: 5px;
         }
 
-        /* Message Display */
+        /* ==================== BUTTONS ==================== */
+        #endTurnBtn {
+            width: 100%;
+            padding: 12px 20px;
+            margin-top: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        #endTurnBtn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+        }
+
+        #endTurnBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #helpBtn,
+        #muteBtn {
+            position: fixed;
+            bottom: 20px;
+            width: 60px;
+            height: 60px;
+            font-size: 28px;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 50%;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            transition: all 0.2s;
+            z-index: 50;
+        }
+
+        #helpBtn { right: 20px; }
+        #muteBtn { left: 20px; }
+
+        #helpBtn:hover,
+        #muteBtn:hover {
+            transform: scale(1.1);
+        }
+
+        /* ==================== MESSAGES ==================== */
         #message {
             position: fixed;
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
+            padding: 15px 30px;
             background: rgba(0, 0, 0, 0.8);
             color: white;
-            padding: 15px 30px;
-            border-radius: 8px;
             font-size: 18px;
             font-weight: 600;
+            border-radius: 8px;
             display: none;
-            z-index: 100;
             animation: fadeIn 0.3s;
+            z-index: 100;
         }
+
+        #message.show { display: block; }
+        #message.success { background: rgba(46, 204, 113, 0.9); }
+        #message.error { background: rgba(231, 76, 60, 0.9); }
+        #message.info { background: rgba(52, 152, 219, 0.9); }
 
         @keyframes fadeIn {
             from {
                 opacity: 0;
                 transform: translateX(-50%) translateY(-20px);
             }
-
             to {
                 opacity: 1;
                 transform: translateX(-50%) translateY(0);
             }
         }
 
-        #message.show {
-            display: block;
-        }
-
-        #message.success {
-            background: rgba(46, 204, 113, 0.9);
-        }
-
-        #message.error {
-            background: rgba(231, 76, 60, 0.9);
-        }
-
-        #message.info {
-            background: rgba(52, 152, 219, 0.9);
-        }
-
-        /* Modals */
+        /* ==================== MODALS ==================== */
         .modal {
             position: fixed;
             inset: 0;
+            padding: 20px;
             background: rgba(0, 0, 0, 0.9);
             display: none;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             text-align: center;
-            z-index: 200;
             gap: 20px;
-            padding: 20px;
+            z-index: 200;
         }
 
         .modal.active {
@@ -425,11 +403,11 @@
             padding: 18px;
             font-size: 18px;
             font-weight: 600;
-            cursor: pointer;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border: none;
             border-radius: 8px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            cursor: pointer;
             transition: all 0.2s;
         }
 
@@ -442,24 +420,24 @@
             width: 280px;
             padding: 18px;
             font-size: 18px;
+            color: white;
+            background: #2a2a2a;
             border: 2px solid #555;
             border-radius: 8px;
-            background: #2a2a2a;
-            color: white;
         }
 
         .modal input::placeholder {
             color: #888;
         }
 
-        /* Rules Display */
+        /* ==================== RULES MODAL ==================== */
         #rules {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 20px;
-            border-radius: 12px;
             max-width: 600px;
-            text-align: left;
             max-height: 70vh;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            text-align: left;
             overflow-y: auto;
         }
 
@@ -487,45 +465,8 @@
             margin-right: 8px;
         }
 
-        /* Helper Buttons */
-        #helpBtn,
-        #muteBtn {
-            position: fixed;
-            bottom: 20px;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            font-size: 28px;
-            border: none;
-            cursor: pointer;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-            z-index: 50;
-            transition: all 0.2s;
-        }
-
-        #helpBtn {
-            right: 20px;
-        }
-
-        #muteBtn {
-            left: 20px;
-        }
-
-        #helpBtn:hover,
-        #muteBtn:hover {
-            transform: scale(1.1);
-        }
-
-        /* Mobile Responsive */
+        /* ==================== MOBILE RESPONSIVE ==================== */
         @media (max-width: 768px) {
-            body {
-                overflow: hidden;
-                width: 100%;
-                height: 100%;
-            }
-
             #gameArea {
                 padding-bottom: 200px;
             }
@@ -545,8 +486,8 @@
             .card {
                 width: 65px;
                 height: 95px;
-                font-size: 12px;
                 padding: 5px;
+                font-size: 12px;
             }
 
             .card-top,
@@ -565,42 +506,34 @@
 
             #playerHandContainer {
                 height: 170px;
+                padding: 0 50vw 15px;
                 overflow-x: scroll;
-                overflow-y: visible;
-                padding: 0 50vw;
-                padding-bottom: 15px;
             }
 
             #playerHand {
                 height: 155px;
-                max-width: none;
             }
 
-            /* Move player info above hand in mobile */
             #playerInfoContainer {
                 position: fixed;
-                right: auto;
                 left: 50%;
-                top: auto;
                 bottom: 140px;
                 transform: translateX(-50%);
                 flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: center;
                 gap: 8px;
                 max-width: 90vw;
-                align-items: center;
-                justify-content: center;
-                flex-wrap: wrap;
             }
 
             #playerInfo {
                 flex-direction: row;
-                gap: 8px;
                 flex-wrap: wrap;
+                gap: 8px;
             }
 
             .player-card {
                 padding: 8px 12px;
-                font-size: 12px;
             }
 
             .player-name {
@@ -613,10 +546,10 @@
             }
 
             #endTurnBtn {
-                padding: 10px 16px;
-                font-size: 14px;
                 width: auto;
+                padding: 10px 16px;
                 margin-top: 0;
+                font-size: 14px;
             }
         }
     </style>
@@ -1289,10 +1222,13 @@
                 const gap = isMobile ? 10 : overlap;
 
                 const cardElements = [];
+                let draggedCard = null;
+                let draggedIndex = null;
 
                 hand.forEach((card, index) => {
                     const cardEl = cards.createCardElement(card, () => this.onHandCardClick(card));
                     cardEl.dataset.cardIndex = index;
+                    cardEl.draggable = true;
 
                     // Position card in fan
                     if (isMobile) {
@@ -1312,6 +1248,37 @@
                         state.game.selectedCard.suit === card.suit) {
                         cardEl.classList.add('selected');
                     }
+
+                    // Drag and drop event handlers
+                    cardEl.addEventListener('dragstart', (e) => {
+                        draggedCard = card;
+                        draggedIndex = index;
+                        cardEl.style.opacity = '0.5';
+                        e.dataTransfer.effectAllowed = 'move';
+                    });
+
+                    cardEl.addEventListener('dragend', (e) => {
+                        cardEl.style.opacity = '1';
+                        draggedCard = null;
+                        draggedIndex = null;
+                    });
+
+                    cardEl.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                    });
+
+                    cardEl.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        if (draggedCard && draggedIndex !== null && draggedIndex !== index) {
+                            // Reorder the hand
+                            const newHand = [...hand];
+                            newHand.splice(draggedIndex, 1);
+                            newHand.splice(index, 0, draggedCard);
+                            state.game.playerHands[player] = newHand;
+                            this.renderHand();
+                        }
+                    });
 
                     // Add macOS dock effect (desktop only)
                     if (!isMobile) {
@@ -1462,10 +1429,11 @@
             },
 
             checkWin() {
-                const player = state.game.myPlayer;
-                if (state.game.playerHands[player].length === 0) {
-                    this.showWin(player);
-                    return true;
+                for (let i = 0; i < state.game.activePlayers; i++) {
+                    if (state.game.playerHands[i].length === 0) {
+                        this.showWin(i);
+                        return true;
+                    }
                 }
                 return false;
             },
