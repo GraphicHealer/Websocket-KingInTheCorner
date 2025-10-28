@@ -732,6 +732,7 @@
     <div id="waitingModal" class="modal">
         <h1 id="waitingTitle">Waiting for players...</h1>
         <p id="waitingText"></p>
+        <button id="copyLinkBtn" style="display:none;">Copy Game Link</button>
         <div id="roomPlayers" style="display: none; margin: 20px 0;">
             <h3 style="color: #ffd700; margin-bottom: 15px;">Players in Room:</h3>
             <div id="playersList" style="color: white; font-size: 18px;"></div>
@@ -883,7 +884,8 @@
                 backToOnline: document.getElementById('backToOnlineBtn'),
                 rematch: document.getElementById('rematchBtn'),
                 menu: document.getElementById('menuBtn'),
-                closeRules: document.getElementById('closeRulesBtn')
+                closeRules: document.getElementById('closeRulesBtn'),
+                copyLink: document.getElementById('copyLinkBtn')
             },
             inputs: {
                 name: document.getElementById('nameInput'),
@@ -1790,6 +1792,7 @@
                     case 'roomCreated':
                         state.network.roomId = data.roomId;
                         utils.showModal('waiting');
+                        dom.buttons.copyLink.style.display = data.isPrivate || true ? 'block' : 'none';
                         dom.waitingText.textContent = `Room Code: ${data.roomId}`;
                         break;
 
@@ -2048,6 +2051,13 @@
             state.network.ws.addEventListener('open', () => {
                 state.network.ws.send(JSON.stringify({ type: 'joinPrivate', roomId, displayName: name }));
             });
+        });
+
+        dom.buttons.copyLink.addEventListener('click', () => {
+            if (!state.network.roomId) return;
+            const url = `${window.location.origin}?room=${state.network.roomId}`;
+            navigator.clipboard.writeText(url);
+            utils.showMessage('Link copied to clipboard!', 'success');
         });
 
         dom.buttons.rematch.addEventListener('click', () => {
