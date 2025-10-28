@@ -918,7 +918,6 @@
             },
             waitingText: document.getElementById('waitingText'),
             winText: document.getElementById('winText'),
-            inviteHelper: document.getElementById('inviteHelper'),
             roomPlayers: document.getElementById('roomPlayers'),
             playersList: document.getElementById('playersList'),
             gameStartControls: document.getElementById('gameStartControls'),
@@ -1819,7 +1818,6 @@
                         state.network.roomId = data.roomId;
                         utils.showModal('waiting');
                         dom.buttons.copyLink.style.display = data.isPrivate || true ? 'block' : 'none';
-                        dom.inviteHelper.style.display = data.isPrivate || true ? 'block' : 'none';
                         dom.waitingText.textContent = `Room Code: ${data.roomId}`;
                         break;
 
