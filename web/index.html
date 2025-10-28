@@ -397,7 +397,7 @@
             font-size: 18px;
             font-weight: 600;
             display: none;
-            z-index: 1000;
+            z-index: 100;
             animation: fadeIn 0.3s;
         }
 
@@ -752,6 +752,14 @@
         <button id="backToOnlineBtn">Back to Menu</button>
     </div>
 
+    <!-- Quick Join Modal -->
+    <div id="quickJoinModal" class="modal">
+        <h1>Join Private Game</h1>
+        <input id="quickNameInput" placeholder="Enter your name" maxlength="20">
+        <button id="quickJoinBtn">Join Game</button>
+        <button id="quickJoinBackBtn">Back</button>
+    </div>
+
     <!-- Waiting Modal -->
     <div id="waitingModal" class="modal">
         <h1 id="waitingTitle">Waiting for players...</h1>
@@ -895,6 +903,7 @@
                 startup: document.getElementById('startupModal'),
                 online: document.getElementById('onlineModal'),
                 private: document.getElementById('privateModal'),
+                quickJoin: document.getElementById('quickJoinModal'),
                 waiting: document.getElementById('waitingModal'),
                 win: document.getElementById('winModal'),
                 rules: document.getElementById('rulesModal')
@@ -904,6 +913,8 @@
                 back: document.getElementById('backBtn'),
                 public: document.getElementById('publicBtn'),
                 private: document.getElementById('privateBtn'),
+                quickJoin: document.getElementById('quickJoinBtn'),
+                quickJoinBack: document.getElementById('quickJoinBackBtn'),
                 createPrivate: document.getElementById('createPrivateBtn'),
                 joinPrivate: document.getElementById('joinPrivateBtn'),
                 backToOnline: document.getElementById('backToOnlineBtn'),
@@ -914,7 +925,8 @@
             },
             inputs: {
                 name: document.getElementById('nameInput'),
-                room: document.getElementById('roomInput')
+                room: document.getElementById('roomInput'),
+                quickName: document.getElementById('quickNameInput')
             },
             waitingText: document.getElementById('waitingText'),
             winText: document.getElementById('winText'),
@@ -2088,9 +2100,38 @@
             });
         });
 
+        dom.buttons.quickJoin.addEventListener('click', () => {
+            const name = dom.inputs.quickName.value.trim();
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomId = urlParams.get('room')?.toUpperCase();
+
+            if (!name || !roomId) {
+                alert('Please enter your name.');
+                return;
+            }
+
+            state.player.name = name;
+            utils.showModal('waiting');
+            dom.waitingText.textContent = `Joining room ${roomId}...`;
+
+            network.connectWebSocket();
+            state.network.ws.addEventListener('open', () => {
+                state.network.ws.send(JSON.stringify({
+                    type: 'joinPrivate',
+                    roomId,
+                    displayName: name
+                }));
+            });
+        });
+
+        dom.buttons.quickJoinBack.addEventListener('click', () => {
+            utils.showModal('startup');
+            window.history.replaceState({}, document.title, window.location.pathname);
+        });
+
         dom.buttons.copyLink.addEventListener('click', () => {
             if (!state.network.roomId) return;
-            const url = `${window.location.origin}?room=${state.network.roomId}`;
+            const url = `${window.location.origin}${window.location.pathname}?room=${state.network.roomId}`;
             navigator.clipboard.writeText(url);
             utils.showMessage('Link copied to clipboard!', 'success');
         });
@@ -2155,6 +2196,13 @@
                 game.renderBoard();
             }
         }, true);  // Add true for capture phase
+
+        // --- Auto-open Quick Join Modal if ?room=XXXXX is in the URL ---
+        const params = new URLSearchParams(window.location.search);
+        const inviteRoom = params.get('room');
+        if (inviteRoom) {
+            utils.showModal('quickJoin');
+        }
 
         console.log('👑 King in the Corner loaded!');
     </script>
