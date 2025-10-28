@@ -667,7 +667,6 @@
         }
     </style>
 </head>
-
 <body>
     <div id="container">
         <div id="gameArea">
@@ -1992,7 +1991,6 @@
         // ==================== EVENT LISTENERS ====================
         dom.buttons.online.addEventListener('click', () => utils.showModal('online'));
         dom.buttons.back.addEventListener('click', () => utils.showModal('startup'));
-        dom.buttons.private.addEventListener('click', () => utils.showModal('private'));
         dom.buttons.backToOnline.addEventListener('click', () => utils.showModal('online'));
 
         dom.buttons.public.addEventListener('click', () => {
@@ -2008,6 +2006,16 @@
             state.network.ws.addEventListener('open', () => {
                 state.network.ws.send(JSON.stringify({ type: 'joinPublic', displayName: name }));
             });
+        });
+
+        dom.buttons.private.addEventListener('click', () => {
+            const name = dom.inputs.name.value.trim();
+            if (!name) {
+                alert('Please enter your name');
+                return;
+            }
+            state.player.name = name;
+            utils.showModal('private');
         });
 
         dom.buttons.createPrivate.addEventListener('click', () => {
