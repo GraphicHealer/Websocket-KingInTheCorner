@@ -500,6 +500,16 @@
             color: #888;
         }
 
+        .modal .helper-text {
+            color: #aaa;
+            font-size: 12px;
+            margin: 2px 0 8px 0;
+            line-height: 1.3;
+            display: block;
+            text-align: center;
+            padding: 0 10px;
+        }
+
         /* Rules Display */
         #rules {
             background: rgba(255, 255, 255, 0.05);
@@ -564,6 +574,16 @@
         #helpBtn:hover,
         #muteBtn:hover {
             transform: scale(1.1);
+        }
+
+        #copyLinkBtn {
+            font-size: 14px;
+            padding: 6px 12px;
+            margin-top: -15px;
+            margin-bottom: 4px;
+            transform: scale(0.9);
+            transform-origin: center;
+            width: 160px;
         }
 
         /* Mobile Responsive */
@@ -710,32 +730,33 @@
     <div id="startupModal" class="modal active">
         <h1>👑 King in the Corner</h1>
         <p>Strategic card game - be the first to empty your hand!</p>
-        <button id="onlineBtn">Play</button>
+        <button id="onlineBtn">Play Online</button>
     </div>
 
     <!-- Online Modal -->
     <div id="onlineModal" class="modal">
         <h1>Online Multiplayer</h1>
         <input id="nameInput" placeholder="Enter a Username" maxlength="20">
-        <button id="publicBtn">Public Game (Anyone can join)</button>
-        <button id="privateBtn">Private Game (Invite Only)</button>
+        <button id="publicBtn">Public Game</button>
+        <button id="privateBtn">Private Game</button>
         <button id="backBtn">Back</button>
     </div>
 
     <!-- Private Modal -->
     <div id="privateModal" class="modal">
         <h1>Private Game</h1>
-        <button id="createPrivateBtn">Create Private Game</button>
+        <button id="createPrivateBtn">Create Private Room</button>
+        <div class="helper-text">- OR -</div>
         <input id="roomInput" placeholder="Enter Room Code" maxlength="8">
-        <button id="joinPrivateBtn">Join Private Game</button>
-        <button id="backToOnlineBtn">Back</button>
+        <button id="joinPrivateBtn">Join Private Room</button>
+        <button id="backToOnlineBtn">Back to Menu</button>
     </div>
 
     <!-- Waiting Modal -->
     <div id="waitingModal" class="modal">
         <h1 id="waitingTitle">Waiting for players...</h1>
         <p id="waitingText"></p>
-        <button id="copyLinkBtn" style="display:none;">Copy Game Link</button>
+        <button id="copyLinkBtn" style="display:none;">⧉ Copy Invite Link</button>
         <div id="roomPlayers" style="display: none; margin: 20px 0;">
             <h3 style="color: #ffd700; margin-bottom: 15px;">Players in Room:</h3>
             <div id="playersList" style="color: white; font-size: 18px;"></div>
@@ -743,10 +764,10 @@
         <div id="gameStartControls" style="display: none; margin-top: 20px;">
             <p id="countdownText" style="color: #ffd700; font-size: 24px; margin-bottom: 15px;"></p>
             <p id="readyStatus" style="color: #aaa; font-size: 16px; margin-bottom: 10px;"></p>
-            <button id="readyBtn" style="width: 280px;">I'm Ready!</button>
+            <button id="readyBtn" style="width: 280px;">Ready</button>
             <button id="startGameBtn"
                 style="width: 280px; display: none; margin-top: 10px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">Start
-                Game Now</button>
+                Game</button>
         </div>
     </div>
 
@@ -816,7 +837,7 @@
                 <li>Strategy tip: Try to create multiple piles to have more play options</li>
             </ul>
         </div>
-        <button id="closeRulesBtn">Got it!</button>
+        <button id="closeRulesBtn">Close</button>
     </div>
 
     <script>
@@ -897,6 +918,7 @@
             },
             waitingText: document.getElementById('waitingText'),
             winText: document.getElementById('winText'),
+            inviteHelper: document.getElementById('inviteHelper'),
             roomPlayers: document.getElementById('roomPlayers'),
             playersList: document.getElementById('playersList'),
             gameStartControls: document.getElementById('gameStartControls'),
@@ -1797,6 +1819,7 @@
                         state.network.roomId = data.roomId;
                         utils.showModal('waiting');
                         dom.buttons.copyLink.style.display = data.isPrivate || true ? 'block' : 'none';
+                        dom.inviteHelper.style.display = data.isPrivate || true ? 'block' : 'none';
                         dom.waitingText.textContent = `Room Code: ${data.roomId}`;
                         break;
 
@@ -2044,7 +2067,7 @@
             state.player.name = name;
             const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
             utils.showModal('waiting');
-            dom.waitingText.innerHTML = `Room Code: <strong>${roomId}</strong><br><small>Share this code with friends!</small>`;
+            dom.waitingText.innerHTML = `Room Code: <strong>${roomId}</strong><br><small>Share this code or link with friends!</small>`;
             network.connectWebSocket();
             state.network.ws.addEventListener('open', () => {
                 state.network.ws.send(JSON.stringify({ type: 'createPrivate', roomId, displayName: name }));
