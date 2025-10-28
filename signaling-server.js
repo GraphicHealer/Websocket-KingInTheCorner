@@ -23,8 +23,8 @@ const CONFIG = {
   PING_INTERVAL: 30000,
   MAX_PLAYERS: 4,
   MIN_PLAYERS: 2,
-  READY_TIMEOUT: 60000,
-  ALONE_TIMEOUT: 30000
+  READY_TIMEOUT: 600000, // 10 Minutes
+  ALONE_TIMEOUT: 300000 // 5 Minutes
 };
 
 // ==================== STATE ====================
