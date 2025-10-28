@@ -667,6 +667,7 @@
         }
     </style>
 </head>
+
 <body>
     <div id="container">
         <div id="gameArea">
@@ -1324,10 +1325,18 @@
                 });
             },
 
-            renderHand() {
-                dom.playerHand.innerHTML = '';
+            renderHand({ skipDraggedCard = false, draggedCardIndex = null } = {}) {
                 const player = state.game.myPlayer;
                 const hand = state.game.playerHands[player];
+
+                // Preserve dragged card element if it's currently being dragged
+                const existingDraggedCard = document.querySelector('.dragging-card');
+                const hasDraggedCard = !!existingDraggedCard;
+                if (hasDraggedCard) {
+                    document.body.appendChild(existingDraggedCard); // Move out of playerHand before clearing
+                }
+
+                dom.playerHand.innerHTML = '';
 
                 const isMobile = window.innerWidth <= 768;
                 const cardWidth = isMobile ? 65 : 85;
@@ -1339,6 +1348,7 @@
                 let currentDropIndex = null;
 
                 hand.forEach((card, index) => {
+                    if (skipDraggedCard && index === draggedCardIndex) return;
                     const cardEl = cards.createCardElement(card, () => this.onHandCardClick(card));
                     cardEl.dataset.cardIndex = index;
 
@@ -1398,43 +1408,146 @@
 
                     // Desktop drag events
                     if (!isMobile) {
-                        // Drag and drop event handlers
-                        cardEl.addEventListener('dragstart', (e) => {
-                            draggedCard = card;
+                        let isDragging = false;
+                        let startX = 0;
+                        let startY = 0;
+                        let ghostElement = null;
+                        let initialMouseX = 0;
+                        let dragMoved = false;
+                        const dragThreshold = 5;
+
+                        cardEl.addEventListener('mousedown', (e) => {
+                            if (e.button !== 0) return; // Only left click
+                            isDragging = true;
+                            dragMoved = false;
+                            startX = e.clientX;
+                            startY = e.clientY;
+                            initialMouseX = e.clientX;
                             draggedIndex = index;
-                            cardEl.style.opacity = '0.5';
-                            e.dataTransfer.effectAllowed = 'move';
-                        });
+                            draggedElement = cardEl;
 
-                        cardEl.addEventListener('dragend', (e) => {
-                            cardEl.style.opacity = '1';
-                            draggedCard = null;
-                            draggedIndex = null;
-                        });
+                            // Get initial position
+                            const rect = cardEl.getBoundingClientRect();
 
-                        cardEl.addEventListener('dragover', (e) => {
+                            // Create ghost placeholder first
+                            ghostElement = cardEl.cloneNode(true);
+                            ghostElement.style.opacity = '0.3';
+                            ghostElement.style.pointerEvents = 'none';
+                            ghostElement.style.cursor = 'default';
+                            ghostElement.style.transition = 'all 0.2s ease-out';
+
+                            // Calculate ghost position
+                            const totalWidth = hand.length > 0 ? cardWidth + (hand.length - 1) * overlap : 0;
+                            const startXPos = -totalWidth / 2;
+                            const xPos = startXPos + (index * overlap);
+                            ghostElement.style.position = 'absolute';
+                            ghostElement.style.left = `calc(50% + ${xPos}px)`;
+                            ghostElement.style.bottom = '0';
+                            ghostElement.style.zIndex = index;
+                            dom.playerHand.appendChild(ghostElement);
+
+                            // Make card follow mouse
+                            cardEl.classList.add('dragging-card');
+                            cardEl.style.position = 'fixed';
+                            cardEl.style.left = `${rect.left}px`;
+                            cardEl.style.top = `${rect.top}px`;
+                            cardEl.style.width = `${rect.width}px`;
+                            cardEl.style.height = `${rect.height}px`;
+                            cardEl.style.margin = '0';
+                            cardEl.style.transform = 'none';
+                            cardEl.style.cursor = 'grabbing';
+                            cardEl.style.zIndex = 10000;
+                            cardEl.style.transition = 'none';
+
                             e.preventDefault();
-                            e.dataTransfer.dropEffect = 'move';
                         });
 
-                        cardEl.addEventListener('drop', (e) => {
-                            e.preventDefault();
-                            if (draggedCard && draggedIndex !== null && draggedIndex !== index) {
-                                // Reorder the hand
-                                const newHand = [...hand];
-                                newHand.splice(draggedIndex, 1);
-                                newHand.splice(index, 0, draggedCard);
+                        const handleMouseMove = (e) => {
+                            if (!isDragging || draggedIndex === null) return;
+
+                            // Move the card with the mouse
+                            const deltaX = e.clientX - startX;
+                            const deltaY = e.clientY - startY;
+
+                            if (!dragMoved && Math.abs(deltaX) < dragThreshold && Math.abs(deltaY) < dragThreshold) {
+                                return;
+                            }
+                            dragMoved = true;
+
+                            cardEl.style.left = `${parseFloat(cardEl.style.left) + deltaX}px`;
+                            cardEl.style.top = `${parseFloat(cardEl.style.top) + deltaY}px`;
+                            startX = e.clientX;
+                            startY = e.clientY;
+
+                            // Calculate which position the card should snap to (using original working logic)
+                            const totalDeltaFromStart = e.clientX - initialMouseX;
+                            const cardUnderMouse = Math.round(totalDeltaFromStart / overlap);
+                            const newIndex = Math.max(0, Math.min(hand.length - 1, index + cardUnderMouse));
+
+                            // If we've moved to a different position, update ghost position
+                            if (newIndex !== draggedIndex) {
+                                const newHand = [...state.game.playerHands[player]];
+                                const [movedCard] = newHand.splice(draggedIndex, 1);
+                                newHand.splice(newIndex, 0, movedCard);
                                 state.game.playerHands[player] = newHand;
+
+                                draggedIndex = newIndex;
+
+                                // Update ghost position
+                                if (ghostElement) {
+                                    const totalWidth = hand.length > 0 ? cardWidth + (hand.length - 1) * overlap : 0;
+                                    const startXGhost = -totalWidth / 2;
+                                    const xPos = startXGhost + (newIndex * overlap);
+                                    ghostElement.style.left = `calc(50% + ${xPos}px)`;
+                                    ghostElement.style.zIndex = newIndex;
+                                }
+
+                                this.renderHand({ skipDraggedCard: true, draggedCardIndex: newIndex });
+
+                                dom.playerHand.appendChild(ghostElement);
+
+                                utils.playSound(500, 0.05);
+                            }
+                        };
+
+                        const handleMouseUp = () => {
+                            if (isDragging) {
+                                isDragging = false;
+
+                                // If we haven't moved the card, it's a click
+                                if (!dragMoved) {
+                                    this.onHandCardClick(card);
+                                }
+
+                                // Remove ghost
+                                if (ghostElement) {
+                                    ghostElement.remove();
+                                    ghostElement = null;
+                                }
+
+                                draggedIndex = null;
+                                draggedElement = null;
+
+                                // Remove any existing dragged card
+                                const existingDraggedCard = document.querySelector('.dragging-card');
+                                if (existingDraggedCard) {
+                                    existingDraggedCard.remove(); // remove from DOM
+                                }
+
+                                // Re-render to place card properly
                                 this.renderHand();
                             }
-                        });
+                        };
+
+                        document.addEventListener('mousemove', handleMouseMove);
+                        document.addEventListener('mouseup', handleMouseUp);
                     }
 
                     // Add macOS dock effect (desktop only)
                     if (!isMobile) {
                         const applyDockEffect = (hoverIndex) => {
                             cardElements.forEach((el, i) => {
-                                if (i === draggedIndex) return;
+                                if (i === draggedIndex || el.classList.contains('dragging-card')) return;
 
                                 const distance = Math.abs(i - hoverIndex);
                                 let scale = 1;
@@ -1472,6 +1585,10 @@
 
                     dom.playerHand.appendChild(cardEl);
                     cardElements.push(cardEl);
+
+                    if (existingDraggedCard) {
+                        document.body.appendChild(existingDraggedCard);
+                    }
                 });
 
                 // Set dynamic width for mobile scrolling
