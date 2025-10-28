@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -395,7 +396,7 @@
             font-size: 18px;
             font-weight: 600;
             display: none;
-            z-index: 1000;
+            z-index: 100;
             animation: fadeIn 0.3s;
         }
 
@@ -667,6 +668,7 @@
         }
     </style>
 </head>
+
 <body>
     <div id="container">
         <div id="gameArea">
@@ -728,14 +730,6 @@
         <button id="backToOnlineBtn">Back</button>
     </div>
 
-    <!-- Quick Join Modal -->
-    <div id="quickJoinModal" class="modal">
-        <h1>Join Private Game</h1>
-        <input id="quickNameInput" placeholder="Enter your name" maxlength="20">
-        <button id="quickJoinBtn">Join Game</button>
-        <button id="quickJoinBackBtn">Back</button>
-    </div>
-    
     <!-- Waiting Modal -->
     <div id="waitingModal" class="modal">
         <h1 id="waitingTitle">Waiting for players...</h1>
@@ -823,6 +817,7 @@
         </div>
         <button id="closeRulesBtn">Got it!</button>
     </div>
+
     <script>
         // ==================== CONFIGURATION ====================
         const CONFIG = {
@@ -878,7 +873,6 @@
                 startup: document.getElementById('startupModal'),
                 online: document.getElementById('onlineModal'),
                 private: document.getElementById('privateModal'),
-                quickJoin: document.getElementById('quickJoinModal'),
                 waiting: document.getElementById('waitingModal'),
                 win: document.getElementById('winModal'),
                 rules: document.getElementById('rulesModal')
@@ -891,8 +885,6 @@
                 createPrivate: document.getElementById('createPrivateBtn'),
                 joinPrivate: document.getElementById('joinPrivateBtn'),
                 backToOnline: document.getElementById('backToOnlineBtn'),
-                quickJoin: document.getElementById('quickJoinBtn'),
-                quickJoinBack: document.getElementById('quickJoinBackBtn'),
                 rematch: document.getElementById('rematchBtn'),
                 menu: document.getElementById('menuBtn'),
                 closeRules: document.getElementById('closeRulesBtn'),
@@ -900,8 +892,7 @@
             },
             inputs: {
                 name: document.getElementById('nameInput'),
-                room: document.getElementById('roomInput'),
-                quickName: document.getElementById('quickNameInput')
+                room: document.getElementById('roomInput')
             },
             waitingText: document.getElementById('waitingText'),
             winText: document.getElementById('winText'),
@@ -1960,16 +1951,26 @@
                         break;
 
                     case 'playerLeft':
-                        if (data.playerIndex !== undefined && state.game.gameStarted) {
-                            const playerName = state.game.playerNames[data.playerIndex] || `Player ${data.playerIndex + 1}`;
-                            utils.showMessage(`${playerName} left the game`, 'error', 3000);
-                            state.game.playerHands[data.playerIndex] = [];
+                    case 'playerDisconnected':
+                        const remaining = data.playersRemaining ?? (
+                            data.players ? data.players.length : 0
+                        );
+
+                        if (remaining <= 1) {
+                            utils.showMessage('All other players left. Returning to main menu...', 'error', 4000);
+                            setTimeout(() => {
+                                network.cleanup();
+                                state.game.gameStarted = false;
+                                utils.showModal('startup');
+                                location.reload(); // refresh the page
+                            }, 4000);
+                        } else {
+                            const playerName = data.playerName || (data.playerIndex !== undefined
+                                ? state.game.playerNames[data.playerIndex] || `Player ${data.playerIndex + 1}`
+                                : 'A player');
+                            utils.showMessage(`${playerName} left the game (${remaining} remaining)`, 'error', 3000);
                             game.updateUI();
                         }
-                        break;
-
-                    case 'playerDisconnected':
-                        utils.showMessage(`A player disconnected (${data.playersRemaining} remaining)`, 'error', 3000);
                         break;
 
                     case 'serverShutdown':
@@ -2065,38 +2066,9 @@
             });
         });
 
-        dom.buttons.quickJoin.addEventListener('click', () => {
-            const name = dom.inputs.quickName.value.trim();
-            const urlParams = new URLSearchParams(window.location.search);
-            const roomId = urlParams.get('room')?.toUpperCase();
-        
-            if (!name || !roomId) {
-                alert('Please enter your name.');
-                return;
-            }
-        
-            state.player.name = name;
-            utils.showModal('waiting');
-            dom.waitingText.textContent = `Joining room ${roomId}...`;
-        
-            network.connectWebSocket();
-            state.network.ws.addEventListener('open', () => {
-                state.network.ws.send(JSON.stringify({
-                    type: 'joinPrivate',
-                    roomId,
-                    displayName: name
-                }));
-            });
-        });
-        
-        dom.buttons.quickJoinBack.addEventListener('click', () => {
-            utils.showModal('startup');
-            window.history.replaceState({}, document.title, window.location.pathname);
-        });
-        
         dom.buttons.copyLink.addEventListener('click', () => {
             if (!state.network.roomId) return;
-            const url = `${window.location.origin}${window.location.pathname}?room=${state.network.roomId}`;
+            const url = `${window.location.origin}?room=${state.network.roomId}`;
             navigator.clipboard.writeText(url);
             utils.showMessage('Link copied to clipboard!', 'success');
         });
@@ -2162,14 +2134,8 @@
             }
         }, true);  // Add true for capture phase
 
-        // --- Auto-open Quick Join Modal if ?room=XXXXX is in the URL ---
-        const params = new URLSearchParams(window.location.search);
-        const inviteRoom = params.get('room');
-        if (inviteRoom) {
-            utils.showModal('quickJoin');
-        }
-
         console.log('👑 King in the Corner loaded!');
     </script>
 </body>
+
 </html>
