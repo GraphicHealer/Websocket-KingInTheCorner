@@ -1818,7 +1818,7 @@
                         state.network.roomId = data.roomId;
                         utils.showModal('waiting');
                         dom.buttons.copyLink.style.display = data.isPrivate || true ? 'block' : 'none';
-                        dom.waitingText.textContent = `Room Code: ${data.roomId}`;
+                        dom.waitingText.textContent = `Room Code: <strong>${data.roomId}</strong><br><small>Share this code or link with friends!</small>`;
                         break;
 
                     case 'roomInvalid':
